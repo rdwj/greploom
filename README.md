@@ -2,11 +2,29 @@
 
 Semantic code search with graph-aware context retrieval, built on [treeloom](https://github.com/rdwj/treeloom).
 
-greploom indexes a treeloom Code Property Graph into a hybrid search engine (vector embeddings + BM25) and assembles structurally-complete context neighborhoods for LLM consumption.
+greploom reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector embeddings + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Vector search finds the right neighborhood; graph traversal expands it to include callers, callees, imports, and data flow sources.
 
-## Status
+## Installation
 
-Pre-alpha. Design phase. See [loom-research](https://github.com/rdwj/loom-research) for the full design document.
+```bash
+pip install greploom           # Core — CLI and search engine
+pip install greploom[mcp]      # Adds MCP server (requires fastmcp)
+```
+
+The default embedding model is `nomic-embed-code` via a local [Ollama](https://ollama.com) instance. Any OpenAI-compatible embedding endpoint works via `GREPLOOM_EMBEDDING_URL`.
+
+## Quick Start
+
+```bash
+# 1. Build a CPG with treeloom
+treeloom build src/ -o cpg.json
+
+# 2. Index for search (creates .greploom/index.db)
+greploom index cpg.json
+
+# 3. Search
+greploom query "where is authentication handled?"
+```
 
 ## How It Works
 
@@ -17,7 +35,7 @@ Source code
 treeloom build --> CPG (JSON)
     |
     v
-greploom index --> vector store + BM25 index
+greploom index --> vector store + BM25 index (SQLite)
     |
     v
 greploom query "how is auth handled?" --> context bundle
@@ -26,47 +44,140 @@ greploom query "how is auth handled?" --> context bundle
 LLM agent receives focused, graph-aware context
 ```
 
-Vector search narrows to the right neighborhood. Graph traversal expands to the complete structural context. You need both.
+Storage is a single SQLite file using sqlite-vec for vectors and FTS5 for BM25. No server required, no Docker, portable and inspectable.
 
-## Planned Features
+## CLI Reference
 
-- **Hybrid search**: Vector similarity (sqlite-vec) + BM25 full-text (FTS5) with reciprocal rank fusion
-- **Graph-aware context expansion**: For each search hit, walk the treeloom CPG to include callers, callees, imports, and data flow sources
-- **Token budget management**: Return exactly as much context as the LLM can use, ranked by structural relevance
-- **Three summary tiers**: fast (signatures), enhanced (signatures + docstrings + callees), llm (LLM-generated descriptions)
-- **CLI and MCP server**: Usable from the command line or as an MCP tool for agents
+### `greploom index`
 
-## Planned CLI
+Build or update the search index from a treeloom CPG JSON file.
 
 ```
-greploom index CPG_JSON          # Build search index from treeloom CPG
-greploom query "search terms"    # Hybrid semantic + symbol search
-greploom callers SYMBOL          # Who calls this function?
-greploom callees SYMBOL          # What does this function call?
-greploom deps FILE               # What does this file depend on?
-greploom impact SYMBOL           # What breaks if I change this?
-greploom context FILE:LINE       # Full context neighborhood for a location
-greploom serve                   # MCP server mode
-greploom watch SOURCE_DIR        # Watch and re-index on changes
+greploom index CPG_JSON [OPTIONS]
+
+Arguments:
+  CPG_JSON    Path to the treeloom CPG JSON file
+
+Options:
+  --db PATH              SQLite database path (default: .greploom/index.db)
+  --tier [fast|enhanced] Summary tier (default: enhanced)
+  --model TEXT           Embedding model name
+  --ollama-url URL       Ollama server URL
+  --force                Re-index all nodes, ignoring content hashes
 ```
 
-## Dependencies
+Re-indexing is incremental by default — only nodes whose content has changed are re-embedded. Use `--force` to rebuild from scratch.
 
-| Dependency | Purpose |
-|------------|---------|
-| treeloom | CPG construction and graph queries |
-| sqlite-vec | Vector storage and similarity search |
-| click | CLI framework |
-| tiktoken | Token counting for budget management |
-| httpx | API calls to embedding services |
-| ollama (optional) | Local embedding model inference |
-
-## Installation
+Summary tiers:
+- `fast` — function signatures only; fastest to build
+- `enhanced` — signatures, docstrings, and callees; better recall
 
 ```bash
-pip install greploom              # Core
-pip install greploom[ollama]      # With local embedding support
+# Index with defaults
+greploom index cpg.json
+
+# Use a custom database path and force full re-index
+greploom index cpg.json --db /tmp/myproject.db --force
+
+# Point at a non-default Ollama instance
+greploom index cpg.json --ollama-url http://gpu-box:11434
 ```
+
+### `greploom query`
+
+Search the index and return graph-aware context.
+
+```
+greploom query QUERY_TEXT [OPTIONS]
+
+Arguments:
+  QUERY_TEXT    Natural language or symbol query
+
+Options:
+  --db PATH              SQLite database path (default: .greploom/index.db)
+  --cpg PATH             CPG JSON path for graph expansion
+  --budget INT           Token budget (default: 8192)
+  --top-k INT            Number of search results (default: 5)
+  --format [context|json] Output format (default: context)
+  --model TEXT           Embedding model name
+  --ollama-url URL       Ollama server URL
+```
+
+Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget.
+
+```bash
+# Simple search — ranked hits with summaries
+greploom query "user authentication"
+
+# Full graph-expanded context, ready for an LLM
+greploom query "where is authentication handled?" --cpg cpg.json
+
+# Pipe JSON output to jq
+greploom query "UserService" --cpg cpg.json --format json | jq '.[].name'
+
+# Narrow token budget for smaller context windows
+greploom query "error handling" --cpg cpg.json --budget 4096
+```
+
+### `greploom serve`
+
+Start the MCP server.
+
+```
+greploom serve [OPTIONS]
+
+Options:
+  --db PATH                    SQLite database path
+  --cpg PATH                   Default CPG JSON path
+  --host TEXT                  Host to bind (default: 0.0.0.0)
+  --port INT                   Port to listen on (default: 8901)
+  --transport [streamable-http|stdio]  MCP transport (default: streamable-http)
+```
+
+```bash
+# Start the MCP server on default port 8901
+greploom serve --db .greploom/index.db --cpg cpg.json
+
+# stdio transport for direct agent integration
+greploom serve --transport stdio
+```
+
+## MCP Server
+
+The MCP server exposes two tools:
+
+**`search_code`** — Search code semantically and return graph-aware context.
+
+Parameters: `query` (required), `cpg_path` (required), `db_path`, `budget`, `top_k`
+
+**`index_code`** — Build or update the search index from a CPG JSON file.
+
+Parameters: `cpg_path` (required), `db_path`, `tier`
+
+Example MCP server URL for agent configuration: `http://localhost:8901/mcp`
+
+## Configuration
+
+All settings can be provided via environment variables. CLI flags override environment variables for individual commands.
+
+| Variable | Default | Description |
+|---|---|---|
+| `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Ollama or OpenAI-compatible endpoint |
+| `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-code` | Embedding model name |
+| `GREPLOOM_DB_PATH` | `.greploom/index.db` | SQLite database path |
+| `GREPLOOM_TOKEN_BUDGET` | `8192` | Default token budget for context assembly |
+| `GREPLOOM_SUMMARY_TIER` | `enhanced` | Summary tier (`fast` or `enhanced`) |
+
+To use an OpenAI-compatible embedding API instead of Ollama:
+
+```bash
+export GREPLOOM_EMBEDDING_URL=https://api.openai.com/v1
+export GREPLOOM_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+## Relationship to treeloom
+
+greploom reads treeloom's CPG JSON format but does not import treeloom at runtime. `greploom index` reads the CPG JSON to build the search index; `greploom query` reads both the index and the CPG JSON for graph expansion. Any tool that produces treeloom-compatible CPG JSON will work.
 
 ## License
 

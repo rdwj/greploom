@@ -1,0 +1,275 @@
+{
+  "treeloom_version": "0.3.0",
+  "nodes": [
+    {
+      "id": "module:src/api/routes.py:1:0:0",
+      "kind": "module",
+      "name": "src/api/routes.py",
+      "location": {"file": "src/api/routes.py", "line": 1, "column": 0},
+      "scope": null,
+      "attrs": {}
+    },
+    {
+      "id": "module:src/services/auth.py:1:0:1",
+      "kind": "module",
+      "name": "src/services/auth.py",
+      "location": {"file": "src/services/auth.py", "line": 1, "column": 0},
+      "scope": null,
+      "attrs": {}
+    },
+    {
+      "id": "import:src/api/routes.py:3:0:2",
+      "kind": "import",
+      "name": "AuthService",
+      "location": {"file": "src/api/routes.py", "line": 3, "column": 0},
+      "scope": "module:src/api/routes.py:1:0:0",
+      "attrs": {}
+    },
+    {
+      "id": "import:src/api/routes.py:4:0:3",
+      "kind": "import",
+      "name": "flask",
+      "location": {"file": "src/api/routes.py", "line": 4, "column": 0},
+      "scope": "module:src/api/routes.py:1:0:0",
+      "attrs": {}
+    },
+    {
+      "id": "import:src/services/auth.py:2:0:4",
+      "kind": "import",
+      "name": "jwt",
+      "location": {"file": "src/services/auth.py", "line": 2, "column": 0},
+      "scope": "module:src/services/auth.py:1:0:1",
+      "attrs": {}
+    },
+    {
+      "id": "class:src/services/auth.py:6:0:5",
+      "kind": "class",
+      "name": "AuthService",
+      "location": {"file": "src/services/auth.py", "line": 6, "column": 0},
+      "scope": "module:src/services/auth.py:1:0:1",
+      "attrs": {}
+    },
+    {
+      "id": "function:src/services/auth.py:7:4:6",
+      "kind": "function",
+      "name": "authenticate",
+      "location": {"file": "src/services/auth.py", "line": 7, "column": 4},
+      "scope": "class:src/services/auth.py:6:0:5",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/services/auth.py:7:19:7",
+      "kind": "parameter",
+      "name": "self",
+      "location": {"file": "src/services/auth.py", "line": 7, "column": 19},
+      "scope": "function:src/services/auth.py:7:4:6",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/services/auth.py:7:24:8",
+      "kind": "parameter",
+      "name": "username",
+      "location": {"file": "src/services/auth.py", "line": 7, "column": 24},
+      "scope": "function:src/services/auth.py:7:4:6",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/services/auth.py:7:34:9",
+      "kind": "parameter",
+      "name": "password",
+      "location": {"file": "src/services/auth.py", "line": 7, "column": 34},
+      "scope": "function:src/services/auth.py:7:4:6",
+      "attrs": {}
+    },
+    {
+      "id": "function:src/services/auth.py:14:4:10",
+      "kind": "function",
+      "name": "verify_token",
+      "location": {"file": "src/services/auth.py", "line": 14, "column": 4},
+      "scope": "class:src/services/auth.py:6:0:5",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/services/auth.py:14:18:11",
+      "kind": "parameter",
+      "name": "self",
+      "location": {"file": "src/services/auth.py", "line": 14, "column": 18},
+      "scope": "function:src/services/auth.py:14:4:10",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/services/auth.py:14:24:12",
+      "kind": "parameter",
+      "name": "token",
+      "location": {"file": "src/services/auth.py", "line": 14, "column": 24},
+      "scope": "function:src/services/auth.py:14:4:10",
+      "attrs": {}
+    },
+    {
+      "id": "function:src/api/routes.py:8:0:13",
+      "kind": "function",
+      "name": "login_handler",
+      "location": {"file": "src/api/routes.py", "line": 8, "column": 0},
+      "scope": "module:src/api/routes.py:1:0:0",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/api/routes.py:8:15:14",
+      "kind": "parameter",
+      "name": "request",
+      "location": {"file": "src/api/routes.py", "line": 8, "column": 15},
+      "scope": "function:src/api/routes.py:8:0:13",
+      "attrs": {}
+    },
+    {
+      "id": "function:src/api/routes.py:16:0:15",
+      "kind": "function",
+      "name": "protected_handler",
+      "location": {"file": "src/api/routes.py", "line": 16, "column": 0},
+      "scope": "module:src/api/routes.py:1:0:0",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/api/routes.py:16:19:16",
+      "kind": "parameter",
+      "name": "request",
+      "location": {"file": "src/api/routes.py", "line": 16, "column": 19},
+      "scope": "function:src/api/routes.py:16:0:15",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/api/routes.py:16:28:17",
+      "kind": "parameter",
+      "name": "token",
+      "location": {"file": "src/api/routes.py", "line": 16, "column": 28},
+      "scope": "function:src/api/routes.py:16:0:15",
+      "attrs": {}
+    },
+    {
+      "id": "variable:src/api/routes.py:10:4:18",
+      "kind": "variable",
+      "name": "credentials",
+      "location": {"file": "src/api/routes.py", "line": 10, "column": 4},
+      "scope": "function:src/api/routes.py:8:0:13",
+      "attrs": {}
+    }
+  ],
+  "edges": [
+    {
+      "source": "module:src/api/routes.py:1:0:0",
+      "target": "import:src/api/routes.py:3:0:2",
+      "kind": "imports",
+      "attrs": {}
+    },
+    {
+      "source": "module:src/api/routes.py:1:0:0",
+      "target": "import:src/api/routes.py:4:0:3",
+      "kind": "imports",
+      "attrs": {}
+    },
+    {
+      "source": "module:src/api/routes.py:1:0:0",
+      "target": "function:src/api/routes.py:8:0:13",
+      "kind": "contains",
+      "attrs": {}
+    },
+    {
+      "source": "module:src/api/routes.py:1:0:0",
+      "target": "function:src/api/routes.py:16:0:15",
+      "kind": "contains",
+      "attrs": {}
+    },
+    {
+      "source": "module:src/services/auth.py:1:0:1",
+      "target": "import:src/services/auth.py:2:0:4",
+      "kind": "imports",
+      "attrs": {}
+    },
+    {
+      "source": "module:src/services/auth.py:1:0:1",
+      "target": "class:src/services/auth.py:6:0:5",
+      "kind": "contains",
+      "attrs": {}
+    },
+    {
+      "source": "class:src/services/auth.py:6:0:5",
+      "target": "function:src/services/auth.py:7:4:6",
+      "kind": "contains",
+      "attrs": {}
+    },
+    {
+      "source": "class:src/services/auth.py:6:0:5",
+      "target": "function:src/services/auth.py:14:4:10",
+      "kind": "contains",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/services/auth.py:7:4:6",
+      "target": "parameter:src/services/auth.py:7:19:7",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/services/auth.py:7:4:6",
+      "target": "parameter:src/services/auth.py:7:24:8",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/services/auth.py:7:4:6",
+      "target": "parameter:src/services/auth.py:7:34:9",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/services/auth.py:14:4:10",
+      "target": "parameter:src/services/auth.py:14:18:11",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/services/auth.py:14:4:10",
+      "target": "parameter:src/services/auth.py:14:24:12",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/api/routes.py:8:0:13",
+      "target": "parameter:src/api/routes.py:8:15:14",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/api/routes.py:8:0:13",
+      "target": "function:src/services/auth.py:7:4:6",
+      "kind": "calls",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/api/routes.py:16:0:15",
+      "target": "parameter:src/api/routes.py:16:19:16",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/api/routes.py:16:0:15",
+      "target": "parameter:src/api/routes.py:16:28:17",
+      "kind": "has_parameter",
+      "attrs": {}
+    },
+    {
+      "source": "function:src/api/routes.py:16:0:15",
+      "target": "function:src/services/auth.py:14:4:10",
+      "kind": "calls",
+      "attrs": {}
+    },
+    {
+      "source": "variable:src/api/routes.py:10:4:18",
+      "target": "function:src/services/auth.py:7:4:6",
+      "kind": "data_flows_to",
+      "attrs": {}
+    }
+  ],
+  "annotations": {},
+  "edge_annotations": []
+}

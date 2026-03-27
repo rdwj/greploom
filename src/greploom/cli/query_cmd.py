@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 
 import click
 
@@ -65,7 +66,7 @@ def query(
         hits = hybrid_search(query_text, query_embedding, store, top_k=top_k)
 
         if cpg_path:
-            cpg = load_cpg(cpg_path)
+            cpg = load_cpg(Path(cpg_path))
             expanded = expand_hits([h.node_id for h in hits], cpg)
             ctx = assemble_context(expanded, cfg.token_budget)
 
