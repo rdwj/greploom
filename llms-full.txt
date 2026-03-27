@@ -1,0 +1,404 @@
+# greploom
+
+> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.1.0.
+
+greploom does not parse source code. It consumes CPG JSON produced by [treeloom](https://github.com/rdwj/treeloom), which handles parsing via tree-sitter. Any tool that produces treeloom-compatible CPG JSON will work.
+
+## Core Workflow
+
+```bash
+# 1. Build a CPG with treeloom
+treeloom build src/ -o cpg.json
+
+# 2. Index for search (creates .greploom/index.db)
+greploom index cpg.json
+
+# 3. Search
+greploom query "where is authentication handled?" --cpg cpg.json
+```
+
+The pipeline has three stages:
+
+1. **Index**: Summarize FUNCTION/CLASS/MODULE nodes into text, embed via Ollama, store in SQLite (sqlite-vec + FTS5)
+2. **Search**: Hybrid BM25 + vector search with reciprocal rank fusion
+3. **Expand**: Walk CPG edges from hits to assemble context neighborhoods (callers, callees, imports, data flow), packed within a token budget
+
+## Installation
+
+```bash
+pip install greploom           # Core — CLI and search engine
+pip install greploom[mcp]      # Adds MCP server (requires fastmcp)
+```
+
+Requires a local [Ollama](https://ollama.com) instance with `nomic-embed-code` for embeddings (default). Any OpenAI-compatible endpoint works via `GREPLOOM_EMBEDDING_URL`.
+
+## CLI
+
+### `greploom index`
+
+```
+greploom index CPG_JSON [OPTIONS]
+
+Options:
+  --db PATH              SQLite database path (default: .greploom/index.db)
+  --tier [fast|enhanced] Summary tier (default: enhanced)
+  --model TEXT           Embedding model name
+  --ollama-url URL       Ollama server URL
+  --force                Re-index all nodes, ignoring content hashes
+```
+
+Re-indexing is incremental by default — only nodes whose content hash changed are re-embedded.
+
+Summary tiers:
+- `fast` — function signatures only
+- `enhanced` — signatures, parameters, callees, decorators, class methods
+
+### `greploom query`
+
+```
+greploom query QUERY_TEXT [OPTIONS]
+
+Options:
+  --db PATH              SQLite database path (default: .greploom/index.db)
+  --cpg PATH             CPG JSON path for graph expansion
+  --budget INT           Token budget (default: 8192)
+  --top-k INT            Number of search results (default: 5)
+  --format [context|json] Output format (default: context)
+  --model TEXT           Embedding model name
+  --ollama-url URL       Ollama server URL
+```
+
+Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget.
+
+### `greploom serve`
+
+```
+greploom serve [OPTIONS]
+
+Options:
+  --db PATH                    SQLite database path
+  --cpg PATH                   Default CPG JSON path
+  --host TEXT                  Host to bind (default: 0.0.0.0)
+  --port INT                   Port (default: 8901)
+  --transport [streamable-http|stdio]  MCP transport (default: streamable-http)
+```
+
+## Configuration
+
+All settings can be provided via environment variables. CLI flags override them.
+
+| Variable | Default | Description |
+|---|---|---|
+| `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Ollama or OpenAI-compatible endpoint |
+| `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-code` | Embedding model name |
+| `GREPLOOM_DB_PATH` | `.greploom/index.db` | SQLite database path |
+| `GREPLOOM_TOKEN_BUDGET` | `8192` | Default token budget for context assembly |
+| `GREPLOOM_SUMMARY_TIER` | `enhanced` | Summary tier (`fast` or `enhanced`) |
+
+```python
+from greploom.config import GrepLoomConfig
+
+config = GrepLoomConfig.from_env()  # reads GREPLOOM_* env vars with defaults
+```
+
+## CPG Types
+
+greploom defines its own types mirroring treeloom's JSON serialization. No runtime import of treeloom.
+
+```python
+from greploom.cpg_types import (
+    NodeKind, EdgeKind, CpgNode, CpgEdge, CpgData, SourceLocation, load_cpg,
+)
+
+class NodeKind(str, Enum):
+    MODULE = "module"
+    CLASS = "class"
+    FUNCTION = "function"
+    PARAMETER = "parameter"
+    VARIABLE = "variable"
+    CALL = "call"
+    LITERAL = "literal"
+    RETURN = "return"
+    IMPORT = "import"
+    BRANCH = "branch"
+    LOOP = "loop"
+    BLOCK = "block"
+
+class EdgeKind(str, Enum):
+    CONTAINS = "contains"
+    HAS_PARAMETER = "has_parameter"
+    HAS_RETURN_TYPE = "has_return_type"
+    FLOWS_TO = "flows_to"
+    BRANCHES_TO = "branches_to"
+    DATA_FLOWS_TO = "data_flows_to"
+    DEFINED_BY = "defined_by"
+    USED_BY = "used_by"
+    CALLS = "calls"
+    RESOLVES_TO = "resolves_to"
+    IMPORTS = "imports"
+
+@dataclass
+class SourceLocation:
+    file: str
+    line: int       # 1-based
+    column: int = 0
+
+@dataclass
+class CpgNode:
+    id: str                           # opaque string, never parse
+    kind: NodeKind
+    name: str
+    location: SourceLocation | None
+    scope: str | None                 # parent node ID
+    attrs: dict[str, Any]
+
+@dataclass
+class CpgEdge:
+    source: str
+    target: str
+    kind: EdgeKind
+    attrs: dict[str, Any]
+
+@dataclass
+class CpgData:
+    treeloom_version: str
+    nodes: list[CpgNode]
+    edges: list[CpgEdge]
+    annotations: dict[str, dict[str, Any]]
+    edge_annotations: list[dict[str, Any]]
+
+def load_cpg(path: Path) -> CpgData
+```
+
+The CPG JSON format:
+```json
+{
+  "treeloom_version": "0.3.0",
+  "nodes": [{"id": "...", "kind": "function", "name": "...", "location": {"file": "...", "line": 10, "column": 0}, "scope": "...", "attrs": {}}],
+  "edges": [{"source": "...", "target": "...", "kind": "calls", "attrs": {}}],
+  "annotations": {},
+  "edge_annotations": []
+}
+```
+
+## Index Pipeline
+
+```python
+from greploom.index import run_index, IndexResult
+from greploom.config import GrepLoomConfig
+
+@dataclass
+class IndexResult:
+    total: int       # indexable nodes found
+    indexed: int     # nodes embedded and stored
+    skipped: int     # unchanged (same content hash)
+    errors: int      # failed upserts
+
+def run_index(
+    cpg_path: Path,
+    config: GrepLoomConfig,
+    progress: Callable[[str], None] | None = None,
+) -> IndexResult
+```
+
+Only FUNCTION, CLASS, and MODULE nodes are indexed. The pipeline:
+1. Loads CPG JSON
+2. Generates text summaries per node (fast or enhanced tier)
+3. Computes content hashes; skips unchanged nodes
+4. Batch-embeds changed summaries via `EmbeddingClient`
+5. Upserts into `IndexStore` (SQLite + sqlite-vec + FTS5)
+
+### Summarizer
+
+```python
+from greploom.index.summarizer import summarize_node, build_node_lookup, build_edges_from, INDEXABLE_KINDS
+
+INDEXABLE_KINDS = frozenset({NodeKind.FUNCTION, NodeKind.CLASS, NodeKind.MODULE})
+
+def build_node_lookup(cpg: CpgData) -> dict[str, CpgNode]
+def build_edges_from(cpg: CpgData) -> dict[str, list[CpgEdge]]
+
+def summarize_node(
+    node: CpgNode,
+    node_lookup: dict[str, CpgNode],
+    edges_from: dict[str, list[CpgEdge]],
+    tier: str = "enhanced",
+) -> str | None   # None for non-indexable kinds
+```
+
+Fast tier: `function do_thing(request, user_id) in src/api/payments.py:10`
+Enhanced tier adds: Parameters, Calls, Decorators, Methods (for classes), Contains (for modules).
+
+### Embedding Client
+
+```python
+from greploom.index.embedder import EmbeddingClient
+
+class EmbeddingClient:
+    def __init__(self, url: str = "http://localhost:11434", model: str = "nomic-embed-code")
+    def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]
+    def embed_one(self, text: str) -> list[float]
+    def close(self) -> None
+```
+
+Calls `POST {url}/api/embed` with `{"model": model, "input": texts}`. Raises `ConnectionError` if Ollama is unreachable, `RuntimeError` on bad status or missing `embeddings` key.
+
+### SQLite Store
+
+```python
+from greploom.index.store import IndexStore, SearchResult, NodeRecord
+
+class IndexStore:
+    def __init__(self, db_path: str = ":memory:", embedding_dim: int = 768)
+    def upsert(self, node_id, kind, name, file, line, summary, content_hash, embedding) -> bool
+    def get_content_hash(self, node_id: str) -> str | None
+    def vector_search(self, query_embedding: list[float], limit: int = 10) -> list[SearchResult]
+    def bm25_search(self, query: str, limit: int = 10) -> list[SearchResult]
+    def get_node(self, node_id: str) -> NodeRecord | None
+    def close(self) -> None
+```
+
+Uses APSW (not stdlib sqlite3) to load the sqlite-vec extension. Schema: `nodes` table (metadata + content hash), `vec_index` (vec0 virtual table), `fts_index` (FTS5 virtual table). All three share rowids.
+
+## Search Engine
+
+### Hybrid Search with RRF
+
+```python
+from greploom.search.hybrid import hybrid_search, SearchHit
+
+@dataclass
+class SearchHit:
+    node_id: str
+    score: float    # RRF fusion score, higher = better
+    name: str
+    file: str | None
+    line: int | None
+    summary: str
+
+def hybrid_search(
+    query: str,
+    query_embedding: list[float],
+    store: IndexStore,
+    top_k: int = 10,
+    rrf_k: int = 60,
+) -> list[SearchHit]
+```
+
+Fetches `top_k * 2` results from both vector and BM25 backends, merges via reciprocal rank fusion (`1 / (rrf_k + rank)`), sums scores for nodes in both lists.
+
+### Graph Expansion
+
+```python
+from greploom.search.expand import expand_hits, ExpandedNode
+
+@dataclass
+class ExpandedNode:
+    node: CpgNode
+    relevance: float     # 1.0 for hit, decaying by relationship type
+    relationship: str    # "hit", "caller", "callee", "parameter", "class", "import", "data_source"
+
+def expand_hits(
+    hit_node_ids: list[str],
+    cpg: CpgData,
+    depth: int = 1,
+) -> list[ExpandedNode]
+```
+
+BFS expansion from search hits through CPG edges. Relevance weights: hit=1.0, caller/callee=0.8, class=0.7, parameter=0.6, data_source=0.5, import=0.3. Each depth level multiplies relevance by the weight. Import nodes do not recurse. Dedup keeps highest relevance.
+
+### Token Budget
+
+```python
+from greploom.search.budget import assemble_context, ContextResult, ContextBlock
+
+@dataclass
+class ContextBlock:
+    node_id: str
+    file: str | None
+    line: int | None
+    name: str
+    kind: str
+    relationship: str
+    text: str       # formatted markdown block
+    tokens: int     # token count of text
+
+@dataclass
+class ContextResult:
+    blocks: list[ContextBlock]
+    total_tokens: int
+    budget: int
+    truncated: bool    # True if some nodes were dropped
+
+def assemble_context(
+    expanded: list[ExpandedNode],
+    budget: int = 8192,
+) -> ContextResult
+```
+
+Sorts by relevance descending, greedily packs formatted blocks until budget exhausted. Uses tiktoken `cl100k_base` encoding. Blocks that partially fit are truncated. Each block is formatted as:
+
+```
+## {relationship}: {kind} {name} ({file}:{line})
+
+{summary}
+Defined at {file}:{line}
+```
+
+## MCP Server
+
+```python
+from greploom.mcp.server import create_server
+
+server = create_server(config=None)  # optional GrepLoomConfig
+server.run(transport="streamable-http", host="0.0.0.0", port=8901)
+```
+
+Two tools:
+
+**`search_code(query, cpg_path, db_path=".greploom/index.db", budget=8192, top_k=5) -> str`**
+Embeds query, runs hybrid search, loads CPG, expands hits, assembles context. Returns formatted text.
+
+**`index_code(cpg_path, db_path=".greploom/index.db", tier="enhanced") -> str`**
+Runs the indexing pipeline. Returns summary string.
+
+## Architecture
+
+```
+greploom/
+├── src/greploom/
+│   ├── cpg_types.py       # CPG JSON types, load_cpg()
+│   ├── config.py          # GrepLoomConfig, env var loading
+│   ├── version.py         # __version__
+│   ├── index/
+│   │   ├── __init__.py    # run_index() orchestrator
+│   │   ├── summarizer.py  # Text summaries from CPG nodes
+│   │   ├── embedder.py    # HTTP client for embeddings
+│   │   └── store.py       # SQLite + sqlite-vec + FTS5
+│   ├── search/
+│   │   ├── hybrid.py      # BM25 + vector + RRF
+│   │   ├── expand.py      # CPG graph walk
+│   │   └── budget.py      # Token budget management
+│   ├── cli/
+│   │   ├── index_cmd.py   # greploom index
+│   │   ├── query_cmd.py   # greploom query
+│   │   └── serve_cmd.py   # greploom serve
+│   └── mcp/
+│       └── server.py      # FastMCP server
+└── tests/
+    ├── fixtures/           # CPG JSON test fixtures
+    ├── test_index/
+    ├── test_search/
+    ├── test_cli/
+    └── test_mcp/
+```
+
+## Gotchas
+
+- **APSW required**: The stdlib `sqlite3` module on some platforms lacks `enable_load_extension`. greploom uses APSW to load the sqlite-vec extension. APSW is a declared dependency.
+- **Node IDs are opaque**: Format is `{kind}:{file}:{line}:{col}:{counter}` but consumers must not parse or construct them. Only use IDs from the CPG JSON.
+- **Indexing only FUNCTION/CLASS/MODULE**: Variables, parameters, calls, etc. are structural detail included via graph expansion, not direct search targets.
+- **Incremental by default**: `greploom index` tracks content hashes. Re-running only re-embeds changed nodes. Use `--force` for a full rebuild.
+- **Embedding endpoint**: Default is Ollama at `localhost:11434`. The API path is `/api/embed` (Ollama format), not `/v1/embeddings` (OpenAI format). The client sends `{"model": "...", "input": ["..."]}`.
+- **Token counting**: Uses `cl100k_base` (GPT-4 encoding) via tiktoken for budget management. The encoder is initialized lazily on first use.
+- **BM25 scores are negative**: FTS5 rank values are negative floats (more negative = better match). Vector scores are negated distances (higher = better). RRF normalizes both into positive fusion scores.

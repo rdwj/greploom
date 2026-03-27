@@ -179,6 +179,10 @@ export GREPLOOM_EMBEDDING_MODEL=text-embedding-3-small
 
 greploom reads treeloom's CPG JSON format but does not import treeloom at runtime. `greploom index` reads the CPG JSON to build the search index; `greploom query` reads both the index and the CPG JSON for graph expansion. Any tool that produces treeloom-compatible CPG JSON will work.
 
+## LLM Documentation
+
+This project provides [llms.txt](llms.txt) and [llms-full.txt](llms-full.txt) files following the [llmstxt.org](https://llmstxt.org/) specification for LLM-friendly documentation.
+
 ## License
 
 MIT

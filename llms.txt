@@ -1,0 +1,32 @@
+# greploom
+
+> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required.
+
+greploom does not parse source code. It consumes CPG JSON produced by [treeloom](https://github.com/rdwj/treeloom), which handles parsing via tree-sitter. Any tool that produces treeloom-compatible CPG JSON will work.
+
+The pipeline has three stages: index (summarize nodes, embed, store in SQLite), search (hybrid BM25 + vector with reciprocal rank fusion), and expand (walk CPG edges to assemble context neighborhoods within a token budget).
+
+Storage is a single SQLite file using sqlite-vec for vectors and FTS5 for BM25. Default embedding model is `nomic-embed-code` via Ollama; any OpenAI-compatible endpoint works.
+
+## Docs
+
+- [README](README.md): Installation, quick start, CLI reference, MCP server, configuration
+- [CLAUDE.md](CLAUDE.md): Project context, architecture, design principles, tech stack
+
+## API Reference
+
+- [CPG Types](src/greploom/cpg_types.py): `NodeKind`, `EdgeKind`, `CpgNode`, `CpgEdge`, `CpgData`, `load_cpg()`
+- [Configuration](src/greploom/config.py): `GrepLoomConfig` dataclass with `from_env()` classmethod
+- [Index Orchestrator](src/greploom/index/__init__.py): `run_index()` — end-to-end indexing pipeline
+- [Summarizer](src/greploom/index/summarizer.py): `summarize_node()` — fast and enhanced tier text summaries
+- [Embedder](src/greploom/index/embedder.py): `EmbeddingClient` — sync HTTP client for Ollama/OpenAI embeddings
+- [Store](src/greploom/index/store.py): `IndexStore` — SQLite + sqlite-vec + FTS5 storage layer
+- [Hybrid Search](src/greploom/search/hybrid.py): `hybrid_search()` — BM25 + vector with RRF fusion
+- [Graph Expansion](src/greploom/search/expand.py): `expand_hits()` — CPG walk for context neighborhoods
+- [Token Budget](src/greploom/search/budget.py): `assemble_context()` — greedy packing within token limits
+- [MCP Server](src/greploom/mcp/server.py): `create_server()` — FastMCP server with `search_code` and `index_code` tools
+
+## Optional
+
+- [pyproject.toml](pyproject.toml): Package metadata, dependencies, extras
+- [Design Document](https://github.com/rdwj/loom-research/blob/main/design/greploom-design.md): Full architectural rationale and research references
