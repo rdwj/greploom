@@ -11,7 +11,7 @@ pip install greploom           # Core — CLI and search engine
 pip install greploom[mcp]      # Adds MCP server (requires fastmcp)
 ```
 
-The default embedding model is `nomic-embed-code` via a local [Ollama](https://ollama.com) instance. Any OpenAI-compatible embedding endpoint works via `GREPLOOM_EMBEDDING_URL`.
+The default embedding model is `nomic-embed-text` via a local [Ollama](https://ollama.com) instance. Any OpenAI-compatible embedding endpoint works via `GREPLOOM_EMBEDDING_URL`.
 
 ## Quick Start
 
@@ -163,7 +163,7 @@ All settings can be provided via environment variables. CLI flags override envir
 | Variable | Default | Description |
 |---|---|---|
 | `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Ollama or OpenAI-compatible endpoint |
-| `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-code` | Embedding model name |
+| `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model name |
 | `GREPLOOM_DB_PATH` | `.greploom/index.db` | SQLite database path |
 | `GREPLOOM_TOKEN_BUDGET` | `8192` | Default token budget for context assembly |
 | `GREPLOOM_SUMMARY_TIER` | `enhanced` | Summary tier (`fast` or `enhanced`) |

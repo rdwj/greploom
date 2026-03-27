@@ -9,7 +9,7 @@ See the [loom-research](https://github.com/rdwj/loom-research) repo for the full
 - Python 3.10+, package name `greploom`
 - Search: sqlite-vec (vector), SQLite FTS5 (BM25), reciprocal rank fusion
 - Graph: reads treeloom CPG JSON format, walks edges for context expansion
-- Embeddings: nomic-embed-code via ollama (default), any OpenAI-compatible endpoint
+- Embeddings: nomic-embed-text via ollama (default), any OpenAI-compatible endpoint
 - CLI: click
 - Token counting: tiktoken
 - Build: Hatchling

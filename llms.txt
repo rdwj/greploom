@@ -6,7 +6,7 @@ greploom does not parse source code. It consumes CPG JSON produced by [treeloom]
 
 The pipeline has three stages: index (summarize nodes, embed, store in SQLite), search (hybrid BM25 + vector with reciprocal rank fusion), and expand (walk CPG edges to assemble context neighborhoods within a token budget).
 
-Storage is a single SQLite file using sqlite-vec for vectors and FTS5 for BM25. Default embedding model is `nomic-embed-code` via Ollama; any OpenAI-compatible endpoint works.
+Storage is a single SQLite file using sqlite-vec for vectors and FTS5 for BM25. Default embedding model is `nomic-embed-text` via Ollama; any OpenAI-compatible endpoint works.
 
 ## Docs
 

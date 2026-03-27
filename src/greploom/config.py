@@ -9,7 +9,7 @@ _VALID_SUMMARY_TIERS = ("fast", "enhanced", "llm")
 @dataclass
 class GrepLoomConfig:
     embedding_url: str = "http://localhost:11434"
-    embedding_model: str = "nomic-embed-code"
+    embedding_model: str = "nomic-embed-text"
     db_path: str = ".greploom/index.db"
     token_budget: int = 8192
     summary_tier: str = "enhanced"

@@ -30,7 +30,7 @@ pip install greploom           # Core — CLI and search engine
 pip install greploom[mcp]      # Adds MCP server (requires fastmcp)
 ```
 
-Requires a local [Ollama](https://ollama.com) instance with `nomic-embed-code` for embeddings (default). Any OpenAI-compatible endpoint works via `GREPLOOM_EMBEDDING_URL`.
+Requires a local [Ollama](https://ollama.com) instance with `nomic-embed-text` for embeddings (default). Any OpenAI-compatible endpoint works via `GREPLOOM_EMBEDDING_URL`.
 
 ## CLI
 
@@ -90,7 +90,7 @@ All settings can be provided via environment variables. CLI flags override them.
 | Variable | Default | Description |
 |---|---|---|
 | `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Ollama or OpenAI-compatible endpoint |
-| `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-code` | Embedding model name |
+| `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model name |
 | `GREPLOOM_DB_PATH` | `.greploom/index.db` | SQLite database path |
 | `GREPLOOM_TOKEN_BUDGET` | `8192` | Default token budget for context assembly |
 | `GREPLOOM_SUMMARY_TIER` | `enhanced` | Summary tier (`fast` or `enhanced`) |
@@ -235,7 +235,7 @@ Enhanced tier adds: Parameters, Calls, Decorators, Methods (for classes), Contai
 from greploom.index.embedder import EmbeddingClient
 
 class EmbeddingClient:
-    def __init__(self, url: str = "http://localhost:11434", model: str = "nomic-embed-code")
+    def __init__(self, url: str = "http://localhost:11434", model: str = "nomic-embed-text")
     def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]
     def embed_one(self, text: str) -> list[float]
     def close(self) -> None

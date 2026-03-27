@@ -12,7 +12,7 @@ from greploom.config import GrepLoomConfig
 def test_default_values():
     cfg = GrepLoomConfig()
     assert cfg.embedding_url == "http://localhost:11434"
-    assert cfg.embedding_model == "nomic-embed-code"
+    assert cfg.embedding_model == "nomic-embed-text"
     assert cfg.db_path == ".greploom/index.db"
     assert cfg.token_budget == 8192
     assert cfg.summary_tier == "enhanced"

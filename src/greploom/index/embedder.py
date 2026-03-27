@@ -9,7 +9,7 @@ class EmbeddingClient:
     def __init__(
         self,
         url: str = "http://localhost:11434",
-        model: str = "nomic-embed-code",
+        model: str = "nomic-embed-text",
     ) -> None:
         self._url = url.rstrip("/")
         self._model = model
