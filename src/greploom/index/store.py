@@ -146,8 +146,22 @@ class IndexStore:
             for r in rows
         ]
 
+    @staticmethod
+    def _sanitize_fts_query(query: str) -> str:
+        """Escape a raw query string for FTS5 MATCH syntax.
+
+        Wraps each whitespace-delimited term in double quotes so FTS5 treats
+        them as literal tokens rather than interpreting special characters
+        like ``*``, ``?``, ``-``, ``(``, ``)`` as query operators.
+        """
+        terms = query.split()
+        if not terms:
+            return '""'
+        return " ".join(f'"{t}"' for t in terms)
+
     def bm25_search(self, query: str, limit: int = 10) -> list[SearchResult]:
         """Return nodes ranked by BM25 full-text score."""
+        fts_query = self._sanitize_fts_query(query)
         rows = list(
             self._conn.execute(
                 """SELECT n.node_id, f.rank, n.name, n.file, n.line, n.summary
@@ -156,7 +170,7 @@ class IndexStore:
                    WHERE fts_index MATCH ?
                    ORDER BY f.rank
                    LIMIT ?""",
-                [query, limit],
+                [fts_query, limit],
             )
         )
         return [
