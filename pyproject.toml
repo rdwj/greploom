@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "treeloom>=0.3.0",
     "sqlite-vec>=0.1.0",
+    "apsw>=3.45",
     "click>=8.0",
     "tiktoken>=0.5.0",
     "httpx>=0.25.0",
