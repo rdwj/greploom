@@ -44,6 +44,9 @@ dev = [
 [project.scripts]
 greploom = "greploom.cli:main"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/greploom"]
+
 [tool.ruff]
 line-length = 99
 target-version = "py310"
@@ -53,3 +56,4 @@ select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
