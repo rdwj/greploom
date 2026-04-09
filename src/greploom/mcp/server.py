@@ -1,4 +1,4 @@
-"""greploom MCP server — exposes search_code and index_code tools via FastMCP."""
+"""greploom MCP server — search_code, get_node_context, index_code via FastMCP."""
 
 from __future__ import annotations
 
@@ -29,7 +29,12 @@ def create_server(config: GrepLoomConfig | None = None) -> FastMCP:
         instructions=(
             "Semantic code search over treeloom Code Property Graphs. "
             "Use search_code to find relevant code by natural language query. "
-            "Use index_code to build or update the search index from a CPG JSON file."
+            "Use get_node_context to retrieve context for specific CPG node IDs directly. "
+            "Use index_code to build or update the search index from a CPG JSON file. "
+            "The index stores metadata about the embedding model used at index time "
+            "(embedding_model, greploom_version, created_at, indexed_at). "
+            "Querying with a different embedding model than was used for indexing "
+            "may degrade results."
         ),
     )
 
@@ -74,6 +79,28 @@ def create_server(config: GrepLoomConfig | None = None) -> FastMCP:
 
         if not context.blocks:
             return "No context could be assembled for the search results."
+
+        return "\n\n".join(block.text for block in context.blocks)
+
+    @mcp.tool()
+    def get_node_context(
+        node_ids: list[str],
+        cpg_path: str,
+        budget: int = 8192,
+    ) -> str:
+        """Return graph-aware context for specific CPG node IDs (bypasses search)."""
+        effective_budget = (_default_config.token_budget if _default_config else budget)
+
+        try:
+            cpg = load_cpg(Path(cpg_path))
+        except Exception as exc:  # noqa: BLE001
+            return f"Error: could not load CPG from {cpg_path!r} — {exc}"
+
+        expanded = expand_hits(node_ids, cpg)
+        context = assemble_context(expanded, budget=effective_budget)
+
+        if not context.blocks:
+            return "No context found for the given node IDs."
 
         return "\n\n".join(block.text for block in context.blocks)
 

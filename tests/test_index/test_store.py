@@ -190,3 +190,44 @@ def test_context_manager_works() -> None:
     with IndexStore(db_path=":memory:", embedding_dim=DIM) as store:
         assert _insert_node(store) is True
         assert store.get_content_hash("n1") is not None
+
+
+# ---------------------------------------------------------------------------
+# Metadata
+# ---------------------------------------------------------------------------
+
+
+def test_set_and_get_metadata() -> None:
+    with _store() as store:
+        store.set_metadata("embedding_model", "nomic-embed-text")
+        assert store.get_metadata("embedding_model") == "nomic-embed-text"
+
+
+def test_get_metadata_missing_returns_none() -> None:
+    with _store() as store:
+        assert store.get_metadata("nonexistent_key") is None
+
+
+def test_get_all_metadata_empty() -> None:
+    with _store() as store:
+        assert store.get_all_metadata() == {}
+
+
+def test_get_all_metadata_populated() -> None:
+    with _store() as store:
+        store.set_metadata("embedding_model", "nomic-embed-text")
+        store.set_metadata("greploom_version", "0.1.0")
+        store.set_metadata("created_at", "2026-01-01T00:00:00+00:00")
+        result = store.get_all_metadata()
+        assert result == {
+            "embedding_model": "nomic-embed-text",
+            "greploom_version": "0.1.0",
+            "created_at": "2026-01-01T00:00:00+00:00",
+        }
+
+
+def test_set_metadata_overwrites() -> None:
+    with _store() as store:
+        store.set_metadata("embedding_model", "old-model")
+        store.set_metadata("embedding_model", "new-model")
+        assert store.get_metadata("embedding_model") == "new-model"

@@ -162,3 +162,93 @@ def test_query_command_json_format(indexed_db: Path, runner: CliRunner) -> None:
         assert "node_id" in hit
         assert "score" in hit
         assert "name" in hit
+
+
+# ---------------------------------------------------------------------------
+# --node mode tests
+# ---------------------------------------------------------------------------
+
+NODE_HANDLE_REQUEST = "function:src/app.py:4:0:2"
+NODE_VALIDATE_INPUT = "function:src/app.py:10:0:5"
+NODE_PARAM_REQUEST = "parameter:src/app.py:4:15:3"
+
+
+def test_node_mode_returns_context(runner: CliRunner) -> None:
+    result = runner.invoke(
+        main,
+        ["query", "--node", NODE_HANDLE_REQUEST, "--cpg", str(SMALL_CPG)],
+    )
+    assert result.exit_code == 0, result.output
+    assert len(result.output.strip()) > 0
+
+
+def test_node_mode_multiple_ids(runner: CliRunner) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--node", NODE_VALIDATE_INPUT,
+            "--cpg", str(SMALL_CPG),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert len(result.output.strip()) > 0
+
+
+def test_node_mode_json_format(runner: CliRunner) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG),
+            "--format", "json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert isinstance(payload, list)
+    assert len(payload) > 0
+    block = payload[0]
+    for key in ("node_id", "name", "kind", "file", "line", "relationship", "tokens", "text"):
+        assert key in block, f"Missing key {key!r} in block: {block}"
+
+
+def test_node_mode_unknown_id_returns_empty(runner: CliRunner) -> None:
+    result = runner.invoke(
+        main,
+        ["query", "--node", "function:nonexistent:0:0:99", "--cpg", str(SMALL_CPG)],
+    )
+    assert result.exit_code == 0, result.output
+    # No context assembled — output is empty or whitespace only
+    assert result.output.strip() == ""
+
+
+# ---------------------------------------------------------------------------
+# Metadata in JSON output
+# ---------------------------------------------------------------------------
+
+
+def test_query_json_with_cpg_includes_metadata(indexed_db: Path, runner: CliRunner) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "handle request",
+            "--db",
+            str(indexed_db),
+            "--cpg",
+            str(SMALL_CPG),
+            "--format",
+            "json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert "metadata" in payload, f"Expected 'metadata' key in output: {result.output}"
+    assert "blocks" in payload, f"Expected 'blocks' key in output: {result.output}"
+    assert "embedding_model" in payload["metadata"], (
+        f"Expected 'embedding_model' in metadata: {payload['metadata']}"
+    )

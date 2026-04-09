@@ -40,6 +40,12 @@ def test_index_code_tool_registered(server: FastMCP) -> None:
     assert "index_code" in names, f"Expected 'index_code' in tools, got: {names}"
 
 
-def test_server_has_exactly_two_tools(server: FastMCP) -> None:
+def test_get_node_context_tool_registered(server: FastMCP) -> None:
     tools = asyncio.run(server.list_tools())
-    assert len(tools) == 2, f"Expected 2 tools, got {len(tools)}: {[t.name for t in tools]}"
+    names = [t.name for t in tools]
+    assert "get_node_context" in names, f"Expected 'get_node_context' in tools, got: {names}"
+
+
+def test_server_has_exactly_three_tools(server: FastMCP) -> None:
+    tools = asyncio.run(server.list_tools())
+    assert len(tools) == 3, f"Expected 3 tools, got {len(tools)}: {[t.name for t in tools]}"

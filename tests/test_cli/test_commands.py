@@ -30,3 +30,23 @@ def test_index_nonexistent_file(runner: CliRunner) -> None:
     result = runner.invoke(main, ["index", "/nonexistent/path/cpg.json"])
     assert result.exit_code != 0
     assert "does not exist" in result.output or "Invalid value" in result.output
+
+
+def test_query_node_without_cpg_shows_error(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["query", "--node", "function:src/app.py:4:0:2"])
+    assert result.exit_code != 0
+    assert "--cpg is required" in result.output
+
+
+def test_query_node_and_query_text_are_mutually_exclusive(runner: CliRunner) -> None:
+    result = runner.invoke(
+        main,
+        ["query", "some text", "--node", "function:src/app.py:4:0:2"],
+    )
+    assert result.exit_code != 0
+    assert "mutually exclusive" in result.output
+
+
+def test_query_no_args_shows_error(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["query"])
+    assert result.exit_code != 0

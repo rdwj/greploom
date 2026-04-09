@@ -185,6 +185,19 @@ class IndexStore:
             for r in rows
         ]
 
+    def set_metadata(self, key: str, value: str) -> None:
+        self._conn.execute(
+            "INSERT OR REPLACE INTO metadata(key, value) VALUES (?, ?)", [key, value]
+        )
+
+    def get_metadata(self, key: str) -> str | None:
+        rows = list(self._conn.execute("SELECT value FROM metadata WHERE key=?", [key]))
+        return rows[0][0] if rows else None
+
+    def get_all_metadata(self) -> dict[str, str]:
+        rows = list(self._conn.execute("SELECT key, value FROM metadata"))
+        return {r[0]: r[1] for r in rows}
+
     def get_node(self, node_id: str) -> NodeRecord | None:
         """Return the full NodeRecord for node_id, or None if not found."""
         rows = list(
@@ -233,4 +246,7 @@ class IndexStore:
         )
         self._conn.execute(
             "CREATE VIRTUAL TABLE IF NOT EXISTS fts_index USING fts5(name, summary)"
+        )
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
         )

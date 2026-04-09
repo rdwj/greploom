@@ -18,7 +18,7 @@ from greploom.search.hybrid import hybrid_search
 
 
 @click.command()
-@click.argument("query_text")
+@click.argument("query_text", required=False, default=None)
 @click.option("--db", "db_path", default=None, help="SQLite database path.")
 @click.option(
     "--cpg",
@@ -38,8 +38,14 @@ from greploom.search.hybrid import hybrid_search
 )
 @click.option("--model", "embedding_model", default=None, help="Embedding model name.")
 @click.option("--ollama-url", "embedding_url", default=None, help="Ollama server URL.")
+@click.option(
+    "--node",
+    "node_ids",
+    multiple=True,
+    help="CPG node ID(s) for direct lookup (bypasses search).",
+)
 def query(
-    query_text: str,
+    query_text: str | None,
     db_path: str | None,
     cpg_path: str | None,
     budget: int | None,
@@ -47,8 +53,21 @@ def query(
     output_format: str,
     embedding_model: str | None,
     embedding_url: str | None,
+    node_ids: tuple[str, ...],
 ) -> None:
-    """Search the index and return graph-aware context."""
+    """Search the index and return graph-aware context.
+
+    Results include structural context (callers, callees, parameters) assembled
+    from the CPG graph. Raw source text is not included — source content is
+    provided by treeloom in the CPG; see treeloom documentation for details.
+    """
+    if node_ids and query_text:
+        click.echo("Error: --node and query_text are mutually exclusive.", err=True)
+        sys.exit(1)
+    if not node_ids and not query_text:
+        click.echo("Error: provide either query_text or --node.", err=True)
+        sys.exit(1)
+
     cfg = GrepLoomConfig.from_env()
     if db_path:
         cfg.db_path = db_path
@@ -59,7 +78,40 @@ def query(
     if embedding_url:
         cfg.embedding_url = embedding_url
 
+    if node_ids:
+        if not cpg_path:
+            click.echo("Error: --cpg is required when using --node.", err=True)
+            sys.exit(1)
+        cpg = load_cpg(Path(cpg_path))
+        expanded = expand_hits(list(node_ids), cpg)
+        ctx = assemble_context(expanded, cfg.token_budget)
+        if output_format == "json":
+            blocks = [
+                {
+                    "node_id": b.node_id,
+                    "name": b.name,
+                    "kind": b.kind,
+                    "file": b.file,
+                    "line": b.line,
+                    "relationship": b.relationship,
+                    "tokens": b.tokens,
+                    "text": b.text,
+                }
+                for b in ctx.blocks
+            ]
+            click.echo(json.dumps(blocks, indent=2))
+        else:
+            click.echo(("\n\n").join(b.text for b in ctx.blocks))
+        return
+
     store = IndexStore(cfg.db_path)
+    stored_model = store.get_metadata("embedding_model")
+    if stored_model and stored_model != cfg.embedding_model:
+        click.echo(
+            f"Warning: query model '{cfg.embedding_model}' differs from "
+            f"index model '{stored_model}'. Results may be degraded.",
+            err=True,
+        )
     client = EmbeddingClient(cfg.embedding_url, cfg.embedding_model)
     try:
         query_embedding = client.embed_one(query_text)
@@ -84,7 +136,8 @@ def query(
                     }
                     for b in ctx.blocks
                 ]
-                click.echo(json.dumps(blocks, indent=2))
+                payload = {"metadata": store.get_all_metadata(), "blocks": blocks}
+                click.echo(json.dumps(payload, indent=2))
             else:
                 click.echo(("\n\n").join(b.text for b in ctx.blocks))
         else:

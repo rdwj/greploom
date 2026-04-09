@@ -6,6 +6,7 @@ import hashlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from greploom.config import GrepLoomConfig
@@ -18,6 +19,7 @@ from greploom.index.summarizer import (
     build_node_lookup,
     summarize_node,
 )
+from greploom.version import __version__
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +69,12 @@ def run_index(
 
     # Phase 2: filter unchanged nodes using the store
     with IndexStore(config.db_path) as store:
+        store.set_metadata("embedding_model", config.embedding_model)
+        store.set_metadata("greploom_version", __version__)
+        if not store.get_metadata("created_at"):
+            store.set_metadata("created_at", datetime.now(timezone.utc).isoformat())
+        store.set_metadata("indexed_at", datetime.now(timezone.utc).isoformat())
+
         to_embed: list[tuple] = []
         for node, summary, h in pending:
             if store.get_content_hash(node.id) == h:
