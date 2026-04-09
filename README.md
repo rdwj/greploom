@@ -193,7 +193,7 @@ greploom's query output includes structural summaries and graph context (callers
 
 ## Changelog
 
-### Unreleased
+### Version 0.2.0
 
 - `--node` mode for `greploom query`: retrieve graph context for known CPG node IDs without running a search query.
 - Index metadata: embedding model, greploom version, and timestamps are stored in the index and surfaced in JSON output (text search with `--cpg --format json` wraps results in `{"metadata": ..., "blocks": ...}`; `--node` JSON remains a bare list).
