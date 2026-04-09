@@ -70,7 +70,7 @@ Re-indexing is incremental by default — only nodes whose content has changed a
 
 Summary tiers:
 - `fast` — function signatures only; fastest to build
-- `enhanced` — signatures, docstrings, and callees; better recall
+- `enhanced` — signatures, parameters, callees, decorators, and class methods; better recall
 
 ```bash
 # Index with defaults
@@ -88,22 +88,25 @@ greploom index cpg.json --ollama-url http://gpu-box:11434
 Search the index and return graph-aware context.
 
 ```
-greploom query QUERY_TEXT [OPTIONS]
+greploom query [QUERY_TEXT] [OPTIONS]
 
 Arguments:
-  QUERY_TEXT    Natural language or symbol query
+  QUERY_TEXT    Natural language or symbol query (mutually exclusive with --node)
 
 Options:
-  --db PATH              SQLite database path (default: .greploom/index.db)
-  --cpg PATH             CPG JSON path for graph expansion
-  --budget INT           Token budget (default: 8192)
-  --top-k INT            Number of search results (default: 5)
+  --db PATH               SQLite database path (default: .greploom/index.db)
+  --cpg PATH              CPG JSON path for graph expansion
+  --budget INT            Token budget (default: 8192)
+  --top-k INT             Number of search results (default: 5)
   --format [context|json] Output format (default: context)
-  --model TEXT           Embedding model name
-  --ollama-url URL       Ollama server URL
+  --model TEXT            Embedding model name
+  --ollama-url URL        Ollama server URL
+  --node NODE_ID          CPG node ID for direct lookup (repeatable; bypasses search)
 ```
 
-Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget.
+Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget. When `--format json` is used with text search and `--cpg`, the output is `{"metadata": {...}, "blocks": [...]}` including index metadata. The `--node` JSON output is a bare list of blocks (no metadata envelope, since the index is not consulted).
+
+Use `--node` to retrieve context for known CPG node IDs directly, bypassing the search step entirely. Requires `--cpg`.
 
 ```bash
 # Simple search — ranked hits with summaries
@@ -112,8 +115,11 @@ greploom query "user authentication"
 # Full graph-expanded context, ready for an LLM
 greploom query "where is authentication handled?" --cpg cpg.json
 
-# Pipe JSON output to jq
-greploom query "UserService" --cpg cpg.json --format json | jq '.[].name'
+# JSON output with index metadata
+greploom query "UserService" --cpg cpg.json --format json | jq '.metadata'
+
+# Direct lookup by CPG node ID (no index required)
+greploom query --node "function:src/auth.py:10:0:3" --cpg cpg.json
 
 # Narrow token budget for smaller context windows
 greploom query "error handling" --cpg cpg.json --budget 4096
@@ -144,11 +150,15 @@ greploom serve --transport stdio
 
 ## MCP Server
 
-The MCP server exposes two tools:
+The MCP server exposes three tools:
 
 **`search_code`** — Search code semantically and return graph-aware context.
 
 Parameters: `query` (required), `cpg_path` (required), `db_path`, `budget`, `top_k`
+
+**`get_node_context`** — Return graph-aware context for specific CPG node IDs, bypassing search.
+
+Parameters: `node_ids` (required), `cpg_path` (required), `budget`
 
 **`index_code`** — Build or update the search index from a CPG JSON file.
 
@@ -179,7 +189,15 @@ export GREPLOOM_EMBEDDING_MODEL=text-embedding-3-small
 
 greploom reads treeloom's CPG JSON format but does not import treeloom at runtime. `greploom index` reads the CPG JSON to build the search index; `greploom query` reads both the index and the CPG JSON for graph expansion. Any tool that produces treeloom-compatible CPG JSON will work.
 
+greploom's query output includes structural summaries and graph context (callers, callees, parameters), not raw source code. Source text inclusion is a treeloom CPG concern — when treeloom adds source spans to CPG nodes, greploom will surface them automatically.
+
 ## Changelog
+
+### Unreleased
+
+- `--node` mode for `greploom query`: retrieve graph context for known CPG node IDs without running a search query.
+- Index metadata: embedding model, greploom version, and timestamps are stored in the index and surfaced in JSON output (text search with `--cpg --format json` wraps results in `{"metadata": ..., "blocks": ...}`; `--node` JSON remains a bare list).
+- MCP server: added `get_node_context` tool (direct node ID lookup, parallel to `--node` in the CLI).
 
 ### Version 0.1.0
 

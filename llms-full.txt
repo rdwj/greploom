@@ -1,6 +1,6 @@
 # greploom
 
-> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.1.0.
+> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.1.0. Development branch includes `--node` query mode and index metadata (not yet released).
 
 greploom does not parse source code. It consumes CPG JSON produced by [treeloom](https://github.com/rdwj/treeloom), which handles parsing via tree-sitter. Any tool that produces treeloom-compatible CPG JSON will work.
 
@@ -56,19 +56,22 @@ Summary tiers:
 ### `greploom query`
 
 ```
-greploom query QUERY_TEXT [OPTIONS]
+greploom query [QUERY_TEXT] [OPTIONS]
 
 Options:
-  --db PATH              SQLite database path (default: .greploom/index.db)
-  --cpg PATH             CPG JSON path for graph expansion
-  --budget INT           Token budget (default: 8192)
-  --top-k INT            Number of search results (default: 5)
+  --db PATH               SQLite database path (default: .greploom/index.db)
+  --cpg PATH              CPG JSON path for graph expansion
+  --budget INT            Token budget (default: 8192)
+  --top-k INT             Number of search results (default: 5)
   --format [context|json] Output format (default: context)
-  --model TEXT           Embedding model name
-  --ollama-url URL       Ollama server URL
+  --model TEXT            Embedding model name
+  --ollama-url URL        Ollama server URL
+  --node NODE_ID          CPG node ID for direct lookup (repeatable; bypasses search)
 ```
 
-Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget.
+Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget. When `--format json` is used with text search and `--cpg`, the output is `{"metadata": {...}, "blocks": [...]}` including index metadata.
+
+Use `--node` to retrieve context for known CPG node IDs directly, bypassing the search step entirely. Requires `--cpg`. Mutually exclusive with `QUERY_TEXT`. The `--node` JSON output is a bare list of blocks (no metadata envelope).
 
 ### `greploom serve`
 
@@ -255,10 +258,13 @@ class IndexStore:
     def vector_search(self, query_embedding: list[float], limit: int = 10) -> list[SearchResult]
     def bm25_search(self, query: str, limit: int = 10) -> list[SearchResult]
     def get_node(self, node_id: str) -> NodeRecord | None
+    def set_metadata(self, key: str, value: str) -> None
+    def get_metadata(self, key: str) -> str | None
+    def get_all_metadata(self) -> dict[str, str]
     def close(self) -> None
 ```
 
-Uses APSW (not stdlib sqlite3) to load the sqlite-vec extension. Schema: `nodes` table (metadata + content hash), `vec_index` (vec0 virtual table), `fts_index` (FTS5 virtual table). All three share rowids.
+Uses APSW (not stdlib sqlite3) to load the sqlite-vec extension. Schema: `nodes` table (metadata + content hash), `vec_index` (vec0 virtual table), `fts_index` (FTS5 virtual table), `metadata` table (key-value pairs for embedding model, greploom version, timestamps). All node-related tables share rowids.
 
 ## Search Engine
 
@@ -354,13 +360,16 @@ server = create_server(config=None)  # optional GrepLoomConfig
 server.run(transport="streamable-http", host="0.0.0.0", port=8901)
 ```
 
-Two tools:
+Three tools:
 
 **`search_code(query, cpg_path, db_path=".greploom/index.db", budget=8192, top_k=5) -> str`**
 Embeds query, runs hybrid search, loads CPG, expands hits, assembles context. Returns formatted text.
 
+**`get_node_context(node_ids: list[str], cpg_path, budget=8192) -> str`**
+Returns graph-aware context for specific CPG node IDs, bypassing search. Loads CPG, expands from the given node IDs, assembles context. Returns formatted text.
+
 **`index_code(cpg_path, db_path=".greploom/index.db", tier="enhanced") -> str`**
-Runs the indexing pipeline. Returns summary string.
+Runs the indexing pipeline. Stores metadata (embedding model, version, timestamps). Returns summary string.
 
 ## Architecture
 

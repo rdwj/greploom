@@ -24,7 +24,7 @@ Storage is a single SQLite file using sqlite-vec for vectors and FTS5 for BM25. 
 - [Hybrid Search](src/greploom/search/hybrid.py): `hybrid_search()` — BM25 + vector with RRF fusion
 - [Graph Expansion](src/greploom/search/expand.py): `expand_hits()` — CPG walk for context neighborhoods
 - [Token Budget](src/greploom/search/budget.py): `assemble_context()` — greedy packing within token limits
-- [MCP Server](src/greploom/mcp/server.py): `create_server()` — FastMCP server with `search_code` and `index_code` tools
+- [MCP Server](src/greploom/mcp/server.py): `create_server()` — FastMCP server with `search_code`, `get_node_context`, and `index_code` tools
 
 ## Optional
 
