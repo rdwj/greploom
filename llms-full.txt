@@ -1,6 +1,6 @@
 # greploom
 
-> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.1.0. Development branch includes `--node` query mode and index metadata (not yet released).
+> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.2.0.
 
 greploom does not parse source code. It consumes CPG JSON produced by [treeloom](https://github.com/rdwj/treeloom), which handles parsing via tree-sitter. Any tool that produces treeloom-compatible CPG JSON will work.
 
