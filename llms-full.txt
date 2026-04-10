@@ -70,9 +70,9 @@ Options:
   --include-source        Include raw source text from the CPG when available
 ```
 
-Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget. When `--format json` is used with text search and `--cpg`, the output is `{"metadata": {...}, "blocks": [...]}` including index metadata.
+Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget. All `--format json` output is wrapped in `{"metadata": {...}, "results": [...]}` including the embedding model, greploom version, and index timestamps.
 
-Use `--node` to retrieve context for known CPG node IDs directly, bypassing the search step entirely. Requires `--cpg`. Mutually exclusive with `QUERY_TEXT`. The `--node` JSON output is a bare list of blocks (no metadata envelope).
+Use `--node` to retrieve context for known CPG node IDs directly, bypassing the search step entirely. Requires `--cpg`. Mutually exclusive with `QUERY_TEXT`.
 
 ### `greploom serve`
 

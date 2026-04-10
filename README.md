@@ -105,7 +105,7 @@ Options:
   --include-source        Include raw source text from the CPG when available
 ```
 
-Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget. When `--format json` is used with text search and `--cpg`, the output is `{"metadata": {...}, "blocks": [...]}` including index metadata. The `--node` JSON output is a bare list of blocks (no metadata envelope, since the index is not consulted).
+Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget. All `--format json` output is wrapped in `{"metadata": {...}, "results": [...]}` including the embedding model, greploom version, and index timestamps.
 
 Use `--node` to retrieve context for known CPG node IDs directly, bypassing the search step entirely. Requires `--cpg`.
 
@@ -119,7 +119,7 @@ greploom query "where is authentication handled?" --cpg cpg.json
 # JSON output with index metadata
 greploom query "UserService" --cpg cpg.json --format json | jq '.metadata'
 
-# Direct lookup by CPG node ID (no index required)
+# Direct lookup by CPG node ID (bypasses search)
 greploom query --node "function:src/auth.py:10:0:3" --cpg cpg.json
 
 # Narrow token budget for smaller context windows
@@ -201,6 +201,12 @@ greploom's query output includes structural summaries and graph context (callers
 
 ## Changelog
 
+### Version 0.4.0
+
+- All query output modes (search-only, `--cpg` expansion, `--node` lookup) now use a consistent `{"metadata": {...}, "results": [...]}` JSON envelope with the embedding model, greploom version, and index timestamps.
+- Human-readable output shows a `Model: ... | Indexed: ...` header line.
+- **Breaking:** JSON key renamed from `"blocks"` to `"results"`; search-only and `--node` output changed from bare arrays to the metadata envelope.
+
 ### Version 0.3.1
 
 - Fixed fenced code block corruption when source text contains triple backticks (e.g., Markdown in docstrings).
@@ -216,7 +222,7 @@ greploom's query output includes structural summaries and graph context (callers
 ### Version 0.2.0
 
 - `--node` mode for `greploom query`: retrieve graph context for known CPG node IDs without running a search query.
-- Index metadata: embedding model, greploom version, and timestamps are stored in the index and surfaced in JSON output (text search with `--cpg --format json` wraps results in `{"metadata": ..., "blocks": ...}`; `--node` JSON remains a bare list).
+- Index metadata: embedding model, greploom version, and timestamps are stored in the index and surfaced in all JSON output via the `{"metadata": ..., "results": ...}` envelope.
 - MCP server: added `get_node_context` tool (direct node ID lookup, parallel to `--node` in the CLI).
 
 ### Version 0.1.0
