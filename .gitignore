@@ -21,3 +21,20 @@ venv/
 
 # Test output
 /test-output/
+
+# Secrets and credentials
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.yaml
+secrets.yml
+*_key.txt
+*_token.txt
+*_secret.txt
+api_keys.txt
+tokens.txt
