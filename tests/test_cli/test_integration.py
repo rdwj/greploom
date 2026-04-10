@@ -252,3 +252,31 @@ def test_query_json_with_cpg_includes_metadata(indexed_db: Path, runner: CliRunn
     assert "embedding_model" in payload["metadata"], (
         f"Expected 'embedding_model' in metadata: {payload['metadata']}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Embedding model mismatch warning
+# ---------------------------------------------------------------------------
+
+
+def test_query_warns_on_model_mismatch(indexed_db: Path) -> None:
+    """Query with a different model than the index emits a warning to stderr."""
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "handle request",
+            "--db",
+            str(indexed_db),
+            "--model",
+            "different-model",
+        ],
+    )
+
+    assert result.exit_code == 0, f"stdout: {result.output}\nstderr: {result.stderr}"
+    assert "differs from" in result.stderr, (
+        f"Expected model mismatch warning in stderr, got: {result.stderr!r}"
+    )
+    assert "different-model" in result.stderr
+    assert "nomic-embed-text" in result.stderr
