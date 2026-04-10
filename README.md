@@ -201,6 +201,12 @@ greploom's query output includes structural summaries and graph context (callers
 
 ## Changelog
 
+### Version 0.3.1
+
+- Fixed fenced code block corruption when source text contains triple backticks (e.g., Markdown in docstrings).
+- Fixed Click 8.2+ compatibility for `CliRunner` in tests.
+- Bumped minimum Click dependency to `>=8.2`.
+
 ### Version 0.3.0
 
 - `--include-source` flag for `greploom query`: include raw source text from the CPG in context blocks when available. Off by default. Requires treeloom 0.6.0+ CPG built with `--include-source`.
