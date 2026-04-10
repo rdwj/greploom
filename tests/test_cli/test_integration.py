@@ -260,9 +260,8 @@ def test_query_json_with_cpg_includes_metadata(indexed_db: Path, runner: CliRunn
 # ---------------------------------------------------------------------------
 
 
-def test_query_warns_on_model_mismatch(indexed_db: Path) -> None:
+def test_query_warns_on_model_mismatch(indexed_db: Path, runner: CliRunner) -> None:
     """Query with a different model than the index emits a warning to stderr."""
-    runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         main,
         [
