@@ -1,0 +1,78 @@
+{
+  "treeloom_version": "0.6.0",
+  "nodes": [
+    {
+      "id": "module:src/app.py:1:0:0",
+      "kind": "module",
+      "name": "src/app.py",
+      "location": {"file": "src/app.py", "line": 1, "column": 0},
+      "scope": null,
+      "attrs": {}
+    },
+    {
+      "id": "import:src/app.py:1:0:1",
+      "kind": "import",
+      "name": "json",
+      "location": {"file": "src/app.py", "line": 1, "column": 0},
+      "scope": "module:src/app.py:1:0:0",
+      "attrs": {}
+    },
+    {
+      "id": "function:src/app.py:4:0:2",
+      "kind": "function",
+      "name": "handle_request",
+      "location": {"file": "src/app.py", "line": 4, "column": 0},
+      "end_location": {"file": "src/app.py", "line": 8, "column": 0},
+      "scope": "module:src/app.py:1:0:0",
+      "attrs": {
+        "source_text": "def handle_request(request, user_id):\n    data = json.loads(request.body)\n    if not validate_input(data):\n        return {\"error\": \"invalid input\"}\n    return {\"status\": \"ok\", \"user\": user_id}\n"
+      }
+    },
+    {
+      "id": "parameter:src/app.py:4:15:3",
+      "kind": "parameter",
+      "name": "request",
+      "location": {"file": "src/app.py", "line": 4, "column": 15},
+      "scope": "function:src/app.py:4:0:2",
+      "attrs": {}
+    },
+    {
+      "id": "parameter:src/app.py:4:24:4",
+      "kind": "parameter",
+      "name": "user_id",
+      "location": {"file": "src/app.py", "line": 4, "column": 24},
+      "scope": "function:src/app.py:4:0:2",
+      "attrs": {}
+    },
+    {
+      "id": "function:src/app.py:10:0:5",
+      "kind": "function",
+      "name": "validate_input",
+      "location": {"file": "src/app.py", "line": 10, "column": 0},
+      "end_location": {"file": "src/app.py", "line": 12, "column": 0},
+      "scope": "module:src/app.py:1:0:0",
+      "attrs": {
+        "source_text": "def validate_input(data):\n    if not isinstance(data, dict):\n        return False\n    return \"action\" in data\n"
+      }
+    },
+    {
+      "id": "parameter:src/app.py:10:15:6",
+      "kind": "parameter",
+      "name": "data",
+      "location": {"file": "src/app.py", "line": 10, "column": 15},
+      "scope": "function:src/app.py:10:0:5",
+      "attrs": {}
+    }
+  ],
+  "edges": [
+    {"source": "module:src/app.py:1:0:0", "target": "import:src/app.py:1:0:1", "kind": "imports", "attrs": {}},
+    {"source": "module:src/app.py:1:0:0", "target": "function:src/app.py:4:0:2", "kind": "contains", "attrs": {}},
+    {"source": "module:src/app.py:1:0:0", "target": "function:src/app.py:10:0:5", "kind": "contains", "attrs": {}},
+    {"source": "function:src/app.py:4:0:2", "target": "parameter:src/app.py:4:15:3", "kind": "has_parameter", "attrs": {}},
+    {"source": "function:src/app.py:4:0:2", "target": "parameter:src/app.py:4:24:4", "kind": "has_parameter", "attrs": {}},
+    {"source": "function:src/app.py:4:0:2", "target": "function:src/app.py:10:0:5", "kind": "calls", "attrs": {}},
+    {"source": "function:src/app.py:10:0:5", "target": "parameter:src/app.py:10:15:6", "kind": "has_parameter", "attrs": {}}
+  ],
+  "annotations": {},
+  "edge_annotations": []
+}

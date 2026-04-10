@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from greploom.cpg_types import CpgNode, NodeKind, SourceLocation
-from greploom.search.budget import _count_tokens, assemble_context
+from greploom.search.budget import _count_tokens, _format_block, assemble_context
 from greploom.search.expand import ExpandedNode
 
 # ---------------------------------------------------------------------------
@@ -163,3 +163,59 @@ def test_class_and_module_formatting():
     texts = {b.name: b.text for b in result.blocks}
     assert "class MyClass" in texts["MyClass"]
     assert "module mymodule" in texts["mymodule"]
+
+
+# ---------------------------------------------------------------------------
+# include_source tests
+# ---------------------------------------------------------------------------
+
+_SOURCE_TEXT = "def handle_request(request):\n    return 'ok'"
+
+_NODE_WITH_SOURCE = CpgNode(
+    id="function:src/app.py:4:0:2",
+    kind=NodeKind.FUNCTION,
+    name="handle_request",
+    location=SourceLocation(file="src/app.py", line=4),
+    attrs={"source_text": _SOURCE_TEXT},
+)
+
+_NODE_WITHOUT_SOURCE = CpgNode(
+    id="function:src/app.py:10:0:5",
+    kind=NodeKind.FUNCTION,
+    name="validate_input",
+    location=SourceLocation(file="src/app.py", line=10),
+    attrs={},
+)
+
+
+def test_format_block_excludes_source_by_default():
+    """_format_block with include_source=False must not emit source_text."""
+    expanded = ExpandedNode(node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit")
+    text = _format_block(expanded, include_source=False)
+    assert _SOURCE_TEXT not in text
+    assert "```" not in text
+
+
+def test_format_block_includes_source_with_language_hint():
+    """_format_block with include_source=True emits a fenced python block."""
+    expanded = ExpandedNode(node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit")
+    text = _format_block(expanded, include_source=True)
+    assert _SOURCE_TEXT in text
+    assert "```python" in text
+
+
+def test_format_block_include_source_no_op_when_absent():
+    """include_source=True on a node without source_text produces the same output as False."""
+    expanded = ExpandedNode(node=_NODE_WITHOUT_SOURCE, relevance=1.0, relationship="hit")
+    text_without = _format_block(expanded, include_source=False)
+    text_with = _format_block(expanded, include_source=True)
+    assert text_without == text_with
+    assert "```" not in text_with
+
+
+def test_assemble_context_include_source_propagates():
+    """assemble_context passes include_source through to each block's text."""
+    expanded = ExpandedNode(node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit")
+    result = assemble_context([expanded], budget=500, include_source=True)
+    assert len(result.blocks) == 1
+    assert _SOURCE_TEXT in result.blocks[0].text

@@ -44,6 +44,12 @@ from greploom.search.hybrid import hybrid_search
     multiple=True,
     help="CPG node ID(s) for direct lookup (bypasses search).",
 )
+@click.option(
+    "--include-source",
+    is_flag=True,
+    default=False,
+    help="Include raw source text from the CPG in results when available.",
+)
 def query(
     query_text: str | None,
     db_path: str | None,
@@ -54,12 +60,13 @@ def query(
     embedding_model: str | None,
     embedding_url: str | None,
     node_ids: tuple[str, ...],
+    include_source: bool,
 ) -> None:
     """Search the index and return graph-aware context.
 
     Results include structural context (callers, callees, parameters) assembled
-    from the CPG graph. Raw source text is not included — source content is
-    provided by treeloom in the CPG; see treeloom documentation for details.
+    from the CPG graph. Use --include-source to include raw source text from the
+    CPG when available; by default source text is omitted.
     """
     if node_ids and query_text:
         click.echo("Error: --node and query_text are mutually exclusive.", err=True)
@@ -84,7 +91,7 @@ def query(
             sys.exit(1)
         cpg = load_cpg(Path(cpg_path))
         expanded = expand_hits(list(node_ids), cpg)
-        ctx = assemble_context(expanded, cfg.token_budget)
+        ctx = assemble_context(expanded, cfg.token_budget, include_source=include_source)
         if output_format == "json":
             blocks = [
                 {
@@ -120,7 +127,7 @@ def query(
         if cpg_path:
             cpg = load_cpg(Path(cpg_path))
             expanded = expand_hits([h.node_id for h in hits], cpg)
-            ctx = assemble_context(expanded, cfg.token_budget)
+            ctx = assemble_context(expanded, cfg.token_budget, include_source=include_source)
 
             if output_format == "json":
                 blocks = [

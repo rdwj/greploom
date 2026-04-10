@@ -45,7 +45,47 @@ def _format_summary(node_id: str, kind: NodeKind, name: str, attrs: dict) -> str
     return f"{kind.value} {name}"
 
 
-def _format_block(expanded: ExpandedNode) -> str:
+_EXT_TO_LANG: dict[str, str] = {
+    ".py": "python",
+    ".js": "javascript",
+    ".ts": "typescript",
+    ".jsx": "jsx",
+    ".tsx": "tsx",
+    ".go": "go",
+    ".rs": "rust",
+    ".java": "java",
+    ".rb": "ruby",
+    ".sh": "bash",
+    ".c": "c",
+    ".cpp": "cpp",
+    ".h": "c",
+    ".hpp": "cpp",
+    ".cs": "csharp",
+    ".php": "php",
+    ".swift": "swift",
+    ".kt": "kotlin",
+    ".scala": "scala",
+    ".r": "r",
+    ".sql": "sql",
+    ".yaml": "yaml",
+    ".yml": "yaml",
+    ".json": "json",
+    ".toml": "toml",
+    ".xml": "xml",
+    ".html": "html",
+    ".css": "css",
+}
+
+
+def _lang_hint(file: str | None) -> str:
+    """Return a fenced-code language hint from a file path, or empty string."""
+    if not file:
+        return ""
+    ext = "." + file.rsplit(".", 1)[-1].lower() if "." in file else ""
+    return _EXT_TO_LANG.get(ext, "")
+
+
+def _format_block(expanded: ExpandedNode, include_source: bool = False) -> str:
     node = expanded.node
     loc = node.location
     file_str = loc.file if loc else None
@@ -59,7 +99,15 @@ def _format_block(expanded: ExpandedNode) -> str:
     if loc and loc.file and loc.line:
         body_lines.append(f"Defined at {loc.file}:{loc.line}")
 
-    return header + "\n\n" + "\n".join(body_lines)
+    block = header + "\n\n" + "\n".join(body_lines)
+
+    if include_source:
+        source_text = node.attrs.get("source_text")
+        if source_text:
+            lang = _lang_hint(file_str)
+            block += f"\n\n```{lang}\n{source_text.rstrip(chr(10))}\n```"
+
+    return block
 
 
 @dataclass
@@ -85,6 +133,7 @@ class ContextResult:
 def assemble_context(
     expanded: list[ExpandedNode],
     budget: int = 8192,
+    include_source: bool = False,
 ) -> ContextResult:
     """Format and pack ExpandedNodes into a token-budgeted ContextResult."""
     result = ContextResult(budget=budget)
@@ -99,7 +148,7 @@ def assemble_context(
     remaining = budget
 
     for exp in ordered:
-        text = _format_block(exp)
+        text = _format_block(exp, include_source=include_source)
         count = _count_tokens(text)
         node = exp.node
         loc = node.location

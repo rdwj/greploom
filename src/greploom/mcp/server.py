@@ -45,8 +45,12 @@ def create_server(config: GrepLoomConfig | None = None) -> FastMCP:
         db_path: str = ".greploom/index.db",
         budget: int = 8192,
         top_k: int = 5,
+        include_source: bool = False,
     ) -> str:
-        """Search code semantically and return graph-aware context."""
+        """Search code semantically and return graph-aware context.
+
+        Set include_source=True to include raw source text from the CPG when available.
+        """
         cfg = _default_config or GrepLoomConfig(db_path=db_path, token_budget=budget)
         effective_db = cfg.db_path if _default_config else db_path
         effective_budget = cfg.token_budget if _default_config else budget
@@ -75,7 +79,9 @@ def create_server(config: GrepLoomConfig | None = None) -> FastMCP:
 
         hit_ids = [h.node_id for h in hits]
         expanded = expand_hits(hit_ids, cpg, depth=1)
-        context = assemble_context(expanded, budget=effective_budget)
+        context = assemble_context(
+            expanded, budget=effective_budget, include_source=include_source
+        )
 
         if not context.blocks:
             return "No context could be assembled for the search results."
@@ -87,8 +93,12 @@ def create_server(config: GrepLoomConfig | None = None) -> FastMCP:
         node_ids: list[str],
         cpg_path: str,
         budget: int = 8192,
+        include_source: bool = False,
     ) -> str:
-        """Return graph-aware context for specific CPG node IDs (bypasses search)."""
+        """Return graph-aware context for specific CPG node IDs (bypasses search).
+
+        Set include_source=True to include raw source text from the CPG when available.
+        """
         effective_budget = (_default_config.token_budget if _default_config else budget)
 
         try:
@@ -97,7 +107,9 @@ def create_server(config: GrepLoomConfig | None = None) -> FastMCP:
             return f"Error: could not load CPG from {cpg_path!r} — {exc}"
 
         expanded = expand_hits(node_ids, cpg)
-        context = assemble_context(expanded, budget=effective_budget)
+        context = assemble_context(
+            expanded, budget=effective_budget, include_source=include_source
+        )
 
         if not context.blocks:
             return "No context found for the given node IDs."

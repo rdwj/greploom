@@ -20,6 +20,7 @@ from greploom.cli import main
 
 SMALL_CPG = Path(__file__).parent.parent / "fixtures" / "small_cpg.json"
 MEDIUM_CPG = Path(__file__).parent.parent / "fixtures" / "medium_cpg.json"
+SMALL_CPG_WITH_SOURCE = Path(__file__).parent.parent / "fixtures" / "small_cpg_with_source.json"
 
 
 class FakeEmbeddingClient:
@@ -280,3 +281,84 @@ def test_query_warns_on_model_mismatch(indexed_db: Path) -> None:
     )
     assert "different-model" in result.stderr
     assert "nomic-embed-text" in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# --include-source tests
+# ---------------------------------------------------------------------------
+
+
+def test_node_mode_include_source_emits_source_text(runner: CliRunner) -> None:
+    """--node + --include-source includes raw source in context output."""
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--include-source",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "def handle_request" in result.output
+
+
+def test_node_mode_without_include_source_omits_source_text(runner: CliRunner) -> None:
+    """--node without --include-source does not include raw source in output."""
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "def handle_request" not in result.output
+
+
+def test_node_mode_include_source_json_format(runner: CliRunner) -> None:
+    """--node + --format json + --include-source has source code in the block text field."""
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--format", "json",
+            "--include-source",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert isinstance(payload, list)
+    assert len(payload) > 0
+    # The first block corresponds to the requested node; its text must contain the source.
+    hit_block = next(b for b in payload if b["node_id"] == NODE_HANDLE_REQUEST)
+    assert "def handle_request" in hit_block["text"], (
+        f"Expected source in block text, got: {hit_block['text']!r}"
+    )
+
+
+def test_query_include_source_with_search_and_cpg(tmp_path: Path, runner: CliRunner) -> None:
+    """Hybrid search + CPG expansion with --include-source emits raw source text."""
+    db = tmp_path / "test_with_source.db"
+    index_result = runner.invoke(main, ["index", str(SMALL_CPG_WITH_SOURCE), "--db", str(db)])
+    assert index_result.exit_code == 0, index_result.output
+
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "handle request",
+            "--db",
+            str(db),
+            "--cpg",
+            str(SMALL_CPG_WITH_SOURCE),
+            "--include-source",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "def handle_request" in result.output or "def validate_input" in result.output, (
+        f"Expected raw source text in output, got: {result.output!r}"
+    )
