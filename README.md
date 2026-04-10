@@ -102,6 +102,7 @@ Options:
   --model TEXT            Embedding model name
   --ollama-url URL        Ollama server URL
   --node NODE_ID          CPG node ID for direct lookup (repeatable; bypasses search)
+  --include-source        Include raw source text from the CPG when available
 ```
 
 Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget. When `--format json` is used with text search and `--cpg`, the output is `{"metadata": {...}, "blocks": [...]}` including index metadata. The `--node` JSON output is a bare list of blocks (no metadata envelope, since the index is not consulted).
@@ -154,11 +155,11 @@ The MCP server exposes three tools:
 
 **`search_code`** — Search code semantically and return graph-aware context.
 
-Parameters: `query` (required), `cpg_path` (required), `db_path`, `budget`, `top_k`
+Parameters: `query` (required), `cpg_path` (required), `db_path`, `budget`, `top_k`, `include_source`
 
 **`get_node_context`** — Return graph-aware context for specific CPG node IDs, bypassing search.
 
-Parameters: `node_ids` (required), `cpg_path` (required), `budget`
+Parameters: `node_ids` (required), `cpg_path` (required), `budget`, `include_source`
 
 **`index_code`** — Build or update the search index from a CPG JSON file.
 
@@ -189,7 +190,7 @@ export GREPLOOM_EMBEDDING_MODEL=text-embedding-3-small
 
 greploom reads treeloom's CPG JSON format but does not import treeloom at runtime. `greploom index` reads the CPG JSON to build the search index; `greploom query` reads both the index and the CPG JSON for graph expansion. Any tool that produces treeloom-compatible CPG JSON will work.
 
-greploom's query output includes structural summaries and graph context (callers, callees, parameters), not raw source code. Source text inclusion is a treeloom CPG concern — when treeloom adds source spans to CPG nodes, greploom will surface them automatically.
+greploom's query output includes structural summaries and graph context (callers, callees, parameters). Raw source text can be included via `--include-source` when the CPG contains source spans (treeloom 0.6.0+ with `--include-source`).
 
 ## Documentation
 
@@ -199,6 +200,12 @@ greploom's query output includes structural summaries and graph context (callers
 - [CLAUDE.md](CLAUDE.md) — project context for AI coding assistants
 
 ## Changelog
+
+### Version 0.3.0
+
+- `--include-source` flag for `greploom query`: include raw source text from the CPG in context blocks when available. Off by default. Requires treeloom 0.6.0+ CPG built with `--include-source`.
+- MCP tools `search_code` and `get_node_context` gained `include_source` parameter.
+- Bumped treeloom dependency to `>=0.6.0`.
 
 ### Version 0.2.0
 

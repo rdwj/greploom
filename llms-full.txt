@@ -1,6 +1,6 @@
 # greploom
 
-> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.2.0.
+> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.3.0.
 
 greploom does not parse source code. It consumes CPG JSON produced by [treeloom](https://github.com/rdwj/treeloom), which handles parsing via tree-sitter. Any tool that produces treeloom-compatible CPG JSON will work.
 
@@ -67,6 +67,7 @@ Options:
   --model TEXT            Embedding model name
   --ollama-url URL        Ollama server URL
   --node NODE_ID          CPG node ID for direct lookup (repeatable; bypasses search)
+  --include-source        Include raw source text from the CPG when available
 ```
 
 Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget. When `--format json` is used with text search and `--cpg`, the output is `{"metadata": {...}, "blocks": [...]}` including index metadata.
@@ -176,7 +177,7 @@ def load_cpg(path: Path) -> CpgData
 The CPG JSON format:
 ```json
 {
-  "treeloom_version": "0.3.0",
+  "treeloom_version": "0.6.0",
   "nodes": [{"id": "...", "kind": "function", "name": "...", "location": {"file": "...", "line": 10, "column": 0}, "scope": "...", "attrs": {}}],
   "edges": [{"source": "...", "target": "...", "kind": "calls", "attrs": {}}],
   "annotations": {},
@@ -339,6 +340,7 @@ class ContextResult:
 def assemble_context(
     expanded: list[ExpandedNode],
     budget: int = 8192,
+    include_source: bool = False,
 ) -> ContextResult
 ```
 
@@ -351,6 +353,8 @@ Sorts by relevance descending, greedily packs formatted blocks until budget exha
 Defined at {file}:{line}
 ```
 
+When `include_source=True` and the CPG node has `attrs["source_text"]` (treeloom 0.6.0+ with `--include-source`), a fenced code block with the raw source is appended. Language hint is derived from file extension.
+
 ## MCP Server
 
 ```python
@@ -362,10 +366,10 @@ server.run(transport="streamable-http", host="0.0.0.0", port=8901)
 
 Three tools:
 
-**`search_code(query, cpg_path, db_path=".greploom/index.db", budget=8192, top_k=5) -> str`**
+**`search_code(query, cpg_path, db_path=".greploom/index.db", budget=8192, top_k=5, include_source=False) -> str`**
 Embeds query, runs hybrid search, loads CPG, expands hits, assembles context. Returns formatted text.
 
-**`get_node_context(node_ids: list[str], cpg_path, budget=8192) -> str`**
+**`get_node_context(node_ids: list[str], cpg_path, budget=8192, include_source=False) -> str`**
 Returns graph-aware context for specific CPG node IDs, bypassing search. Loads CPG, expands from the given node IDs, assembles context. Returns formatted text.
 
 **`index_code(cpg_path, db_path=".greploom/index.db", tier="enhanced") -> str`**

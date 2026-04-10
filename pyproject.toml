@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "greploom"
-version = "0.2.0"
+version = "0.3.0"
 description = "Semantic code search with graph-aware context retrieval, built on treeloom"
 readme = "README.md"
 license = "MIT"

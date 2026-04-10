@@ -10,7 +10,7 @@ See the [loom-research](https://github.com/rdwj/loom-research) repo for the full
 - Search: sqlite-vec (vector), FTS5 via APSW (BM25), reciprocal rank fusion
 - Graph: reads treeloom CPG JSON format, walks edges for context expansion
 - Embeddings: nomic-embed-text default model; any OpenAI-compatible endpoint
-- CLI: click
+- CLI: click (query supports `--include-source` for raw source text)
 - Token counting: tiktoken
 - Build: Hatchling
 - Testing: pytest, 80%+ coverage target
@@ -58,7 +58,7 @@ greploom/
 2. **SQLite-only storage.** sqlite-vec + FTS5. No servers, no Docker, one file. Portable and inspectable.
 3. **Hybrid search.** Vector similarity for semantic queries ("where is authentication?") + BM25 for symbol queries ("find UserService"). Reciprocal rank fusion merges results.
 4. **Graph expansion at query time.** Search finds candidate nodes. CPG walk adds callers, callees, imports, data flow sources. The agent gets code in structural context. Direct node lookup via `--node` / `get_node_context` bypasses search for known node IDs.
-5. **Token budget management.** Returns exactly as much context as the LLM can use, ranked by structural relevance. Default: 8192 tokens.
+5. **Token budget management.** Returns exactly as much context as the LLM can use, ranked by structural relevance. Default: 8192 tokens. `--include-source` includes raw source text from the CPG when available (off by default).
 6. **Incremental re-indexing.** Track content hash per node. On re-index, only re-embed changed nodes.
 7. **Index metadata.** The SQLite store records the embedding model, greploom version, and timestamps. JSON output includes this metadata, and queries warn when the embedding model doesn't match the index.
 
