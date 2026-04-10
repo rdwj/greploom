@@ -85,6 +85,19 @@ def _lang_hint(file: str | None) -> str:
     return _EXT_TO_LANG.get(ext, "")
 
 
+def _fence(text: str) -> str:
+    """Return a backtick fence long enough to not collide with content."""
+    longest = 0
+    run = 0
+    for ch in text:
+        if ch == "`":
+            run += 1
+            longest = max(longest, run)
+        else:
+            run = 0
+    return "`" * max(3, longest + 1)
+
+
 def _format_block(expanded: ExpandedNode, include_source: bool = False) -> str:
     node = expanded.node
     loc = node.location
@@ -105,7 +118,8 @@ def _format_block(expanded: ExpandedNode, include_source: bool = False) -> str:
         source_text = node.attrs.get("source_text")
         if source_text:
             lang = _lang_hint(file_str)
-            block += f"\n\n```{lang}\n{source_text.rstrip(chr(10))}\n```"
+            fence = _fence(source_text)
+            block += f"\n\n{fence}{lang}\n{source_text.rstrip(chr(10))}\n{fence}"
 
     return block
 

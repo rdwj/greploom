@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from greploom.cpg_types import CpgNode, NodeKind, SourceLocation
-from greploom.search.budget import _count_tokens, _format_block, assemble_context
+from greploom.search.budget import _count_tokens, _fence, _format_block, assemble_context
 from greploom.search.expand import ExpandedNode
 
 # ---------------------------------------------------------------------------
@@ -219,3 +219,37 @@ def test_assemble_context_include_source_propagates():
     result = assemble_context([expanded], budget=500, include_source=True)
     assert len(result.blocks) == 1
     assert _SOURCE_TEXT in result.blocks[0].text
+
+
+# ---------------------------------------------------------------------------
+# Backtick fence escaping
+# ---------------------------------------------------------------------------
+
+
+def test_fence_no_backticks():
+    assert _fence("def foo(): pass") == "```"
+
+
+def test_fence_triple_backticks_in_content():
+    assert _fence('"""```example```"""') == "````"
+
+
+def test_fence_longer_backtick_run():
+    assert _fence("````code````") == "`````"
+
+
+def test_format_block_escapes_backticks_in_source():
+    """Source text containing triple backticks gets a longer fence."""
+    source = 'def foo():\n    """\n    ```\n    example\n    ```\n    """'
+    node = CpgNode(
+        id="function:src/app.py:1:0:1",
+        kind=NodeKind.FUNCTION,
+        name="foo",
+        location=SourceLocation(file="src/app.py", line=1),
+        attrs={"source_text": source},
+    )
+    expanded = ExpandedNode(node=node, relevance=1.0, relationship="hit")
+    text = _format_block(expanded, include_source=True)
+    assert "````python" in text
+    assert text.endswith("````")
+    assert source.rstrip("\n") in text
