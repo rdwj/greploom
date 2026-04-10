@@ -67,6 +67,15 @@ def indexed_db(tmp_path: Path, runner: CliRunner) -> Path:
     return db
 
 
+@pytest.fixture()
+def indexed_db_with_source(tmp_path: Path, runner: CliRunner) -> Path:
+    """Return a tmp DB path indexed from small_cpg_with_source.json."""
+    db = tmp_path / "test_with_source.db"
+    result = runner.invoke(main, ["index", str(SMALL_CPG_WITH_SOURCE), "--db", str(db)])
+    assert result.exit_code == 0, result.output
+    return db
+
+
 # ---------------------------------------------------------------------------
 # Index command tests
 # ---------------------------------------------------------------------------
@@ -125,9 +134,10 @@ def test_query_command_no_expansion(indexed_db: Path, runner: CliRunner) -> None
     )
 
     assert result.exit_code == 0, result.output
-    # Output should be non-empty JSON
     payload = json.loads(result.output)
-    assert isinstance(payload, list)
+    assert "metadata" in payload, f"Expected 'metadata' key in output: {result.output}"
+    assert "results" in payload, f"Expected 'results' key in output: {result.output}"
+    assert isinstance(payload["results"], list)
 
 
 def test_query_command_with_expansion(indexed_db: Path, runner: CliRunner) -> None:
@@ -156,10 +166,12 @@ def test_query_command_json_format(indexed_db: Path, runner: CliRunner) -> None:
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert isinstance(payload, list)
+    assert "metadata" in payload
+    assert "results" in payload
+    assert isinstance(payload["results"], list)
     # Each hit record should have the expected keys
-    if payload:
-        hit = payload[0]
+    if payload["results"]:
+        hit = payload["results"][0]
         assert "node_id" in hit
         assert "score" in hit
         assert "name" in hit
@@ -174,16 +186,16 @@ NODE_VALIDATE_INPUT = "function:src/app.py:10:0:5"
 NODE_PARAM_REQUEST = "parameter:src/app.py:4:15:3"
 
 
-def test_node_mode_returns_context(runner: CliRunner) -> None:
+def test_node_mode_returns_context(indexed_db: Path, runner: CliRunner) -> None:
     result = runner.invoke(
         main,
-        ["query", "--node", NODE_HANDLE_REQUEST, "--cpg", str(SMALL_CPG)],
+        ["query", "--node", NODE_HANDLE_REQUEST, "--cpg", str(SMALL_CPG), "--db", str(indexed_db)],
     )
     assert result.exit_code == 0, result.output
     assert len(result.output.strip()) > 0
 
 
-def test_node_mode_multiple_ids(runner: CliRunner) -> None:
+def test_node_mode_multiple_ids(indexed_db: Path, runner: CliRunner) -> None:
     result = runner.invoke(
         main,
         [
@@ -191,13 +203,14 @@ def test_node_mode_multiple_ids(runner: CliRunner) -> None:
             "--node", NODE_HANDLE_REQUEST,
             "--node", NODE_VALIDATE_INPUT,
             "--cpg", str(SMALL_CPG),
+            "--db", str(indexed_db),
         ],
     )
     assert result.exit_code == 0, result.output
     assert len(result.output.strip()) > 0
 
 
-def test_node_mode_json_format(runner: CliRunner) -> None:
+def test_node_mode_json_format(indexed_db: Path, runner: CliRunner) -> None:
     result = runner.invoke(
         main,
         [
@@ -205,25 +218,31 @@ def test_node_mode_json_format(runner: CliRunner) -> None:
             "--node", NODE_HANDLE_REQUEST,
             "--cpg", str(SMALL_CPG),
             "--format", "json",
+            "--db", str(indexed_db),
         ],
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert isinstance(payload, list)
-    assert len(payload) > 0
-    block = payload[0]
+    assert "metadata" in payload, f"Expected 'metadata' key in output: {result.output}"
+    assert "results" in payload, f"Expected 'results' key in output: {result.output}"
+    assert len(payload["results"]) > 0
+    block = payload["results"][0]
     for key in ("node_id", "name", "kind", "file", "line", "relationship", "tokens", "text"):
         assert key in block, f"Missing key {key!r} in block: {block}"
 
 
-def test_node_mode_unknown_id_returns_empty(runner: CliRunner) -> None:
+def test_node_mode_unknown_id_returns_empty(indexed_db: Path, runner: CliRunner) -> None:
     result = runner.invoke(
         main,
-        ["query", "--node", "function:nonexistent:0:0:99", "--cpg", str(SMALL_CPG)],
+        [
+            "query", "--node", "function:nonexistent:0:0:99",
+            "--cpg", str(SMALL_CPG), "--db", str(indexed_db),
+        ],
     )
     assert result.exit_code == 0, result.output
-    # No context assembled — output is empty or whitespace only
-    assert result.output.strip() == ""
+    # No context assembled — output shows only the metadata header line
+    lines = result.output.strip().splitlines()
+    assert len(lines) <= 1, f"Expected at most the metadata header, got: {result.output!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +268,7 @@ def test_query_json_with_cpg_includes_metadata(indexed_db: Path, runner: CliRunn
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert "metadata" in payload, f"Expected 'metadata' key in output: {result.output}"
-    assert "blocks" in payload, f"Expected 'blocks' key in output: {result.output}"
+    assert "results" in payload, f"Expected 'results' key in output: {result.output}"
     assert "embedding_model" in payload["metadata"], (
         f"Expected 'embedding_model' in metadata: {payload['metadata']}"
     )
@@ -274,12 +293,13 @@ def test_query_warns_on_model_mismatch(indexed_db: Path, runner: CliRunner) -> N
         ],
     )
 
-    assert result.exit_code == 0, f"stdout: {result.output}\nstderr: {result.stderr}"
-    assert "differs from" in result.stderr, (
-        f"Expected model mismatch warning in stderr, got: {result.stderr!r}"
+    assert result.exit_code == 0, f"output: {result.output}"
+    # Click 8.2+ mixes stderr into stdout by default (mix_stderr deprecated).
+    assert "differs from" in result.output, (
+        f"Expected model mismatch warning in output, got: {result.output!r}"
     )
-    assert "different-model" in result.stderr
-    assert "nomic-embed-text" in result.stderr
+    assert "different-model" in result.output
+    assert "nomic-embed-text" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +307,9 @@ def test_query_warns_on_model_mismatch(indexed_db: Path, runner: CliRunner) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_node_mode_include_source_emits_source_text(runner: CliRunner) -> None:
+def test_node_mode_include_source_emits_source_text(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
     """--node + --include-source includes raw source in context output."""
     result = runner.invoke(
         main,
@@ -296,13 +318,16 @@ def test_node_mode_include_source_emits_source_text(runner: CliRunner) -> None:
             "--node", NODE_HANDLE_REQUEST,
             "--cpg", str(SMALL_CPG_WITH_SOURCE),
             "--include-source",
+            "--db", str(indexed_db_with_source),
         ],
     )
     assert result.exit_code == 0, result.output
     assert "def handle_request" in result.output
 
 
-def test_node_mode_without_include_source_omits_source_text(runner: CliRunner) -> None:
+def test_node_mode_without_include_source_omits_source_text(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
     """--node without --include-source does not include raw source in output."""
     result = runner.invoke(
         main,
@@ -310,13 +335,16 @@ def test_node_mode_without_include_source_omits_source_text(runner: CliRunner) -
             "query",
             "--node", NODE_HANDLE_REQUEST,
             "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--db", str(indexed_db_with_source),
         ],
     )
     assert result.exit_code == 0, result.output
     assert "def handle_request" not in result.output
 
 
-def test_node_mode_include_source_json_format(runner: CliRunner) -> None:
+def test_node_mode_include_source_json_format(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
     """--node + --format json + --include-source has source code in the block text field."""
     result = runner.invoke(
         main,
@@ -326,14 +354,16 @@ def test_node_mode_include_source_json_format(runner: CliRunner) -> None:
             "--cpg", str(SMALL_CPG_WITH_SOURCE),
             "--format", "json",
             "--include-source",
+            "--db", str(indexed_db_with_source),
         ],
     )
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert isinstance(payload, list)
-    assert len(payload) > 0
+    assert "metadata" in payload
+    assert "results" in payload
+    assert len(payload["results"]) > 0
     # The first block corresponds to the requested node; its text must contain the source.
-    hit_block = next(b for b in payload if b["node_id"] == NODE_HANDLE_REQUEST)
+    hit_block = next(b for b in payload["results"] if b["node_id"] == NODE_HANDLE_REQUEST)
     assert "def handle_request" in hit_block["text"], (
         f"Expected source in block text, got: {hit_block['text']!r}"
     )

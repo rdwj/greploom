@@ -17,6 +17,13 @@ from greploom.search.expand import expand_hits
 from greploom.search.hybrid import hybrid_search
 
 
+def _echo_human_header(metadata: dict[str, str]) -> None:
+    """Print a one-line metadata banner for human-readable output."""
+    model = metadata.get("embedding_model", "unknown")
+    indexed_at = metadata.get("indexed_at", "unknown")
+    click.echo(f"Model: {model}  |  Indexed: {indexed_at}")
+
+
 @click.command()
 @click.argument("query_text", required=False, default=None)
 @click.option("--db", "db_path", default=None, help="SQLite database path.")
@@ -89,11 +96,17 @@ def query(
         if not cpg_path:
             click.echo("Error: --cpg is required when using --node.", err=True)
             sys.exit(1)
+
+        # Open store to retrieve index metadata for the output envelope.
+        store = IndexStore(cfg.db_path)
+        metadata = store.get_all_metadata()
+        store.close()
+
         cpg = load_cpg(Path(cpg_path))
         expanded = expand_hits(list(node_ids), cpg)
         ctx = assemble_context(expanded, cfg.token_budget, include_source=include_source)
         if output_format == "json":
-            blocks = [
+            results = [
                 {
                     "node_id": b.node_id,
                     "name": b.name,
@@ -106,8 +119,10 @@ def query(
                 }
                 for b in ctx.blocks
             ]
-            click.echo(json.dumps(blocks, indent=2))
+            payload = {"metadata": metadata, "results": results}
+            click.echo(json.dumps(payload, indent=2))
         else:
+            _echo_human_header(metadata)
             click.echo(("\n\n").join(b.text for b in ctx.blocks))
         return
 
@@ -129,6 +144,7 @@ def query(
             expanded = expand_hits([h.node_id for h in hits], cpg)
             ctx = assemble_context(expanded, cfg.token_budget, include_source=include_source)
 
+            metadata = store.get_all_metadata()
             if output_format == "json":
                 blocks = [
                     {
@@ -143,29 +159,28 @@ def query(
                     }
                     for b in ctx.blocks
                 ]
-                payload = {"metadata": store.get_all_metadata(), "blocks": blocks}
+                payload = {"metadata": metadata, "results": blocks}
                 click.echo(json.dumps(payload, indent=2))
             else:
+                _echo_human_header(metadata)
                 click.echo(("\n\n").join(b.text for b in ctx.blocks))
         else:
             if output_format == "json":
-                click.echo(
-                    json.dumps(
-                        [
-                            {
-                                "node_id": h.node_id,
-                                "score": h.score,
-                                "name": h.name,
-                                "file": h.file,
-                                "line": h.line,
-                                "summary": h.summary,
-                            }
-                            for h in hits
-                        ],
-                        indent=2,
-                    )
-                )
+                results = [
+                    {
+                        "node_id": h.node_id,
+                        "score": h.score,
+                        "name": h.name,
+                        "file": h.file,
+                        "line": h.line,
+                        "summary": h.summary,
+                    }
+                    for h in hits
+                ]
+                payload = {"metadata": store.get_all_metadata(), "results": results}
+                click.echo(json.dumps(payload, indent=2))
             else:
+                _echo_human_header(store.get_all_metadata())
                 for h in hits:
                     loc = f"{h.file}:{h.line}" if h.file and h.line else (h.file or "")
                     click.echo(f"[{h.score:.4f}] {h.name}  {loc}\n  {h.summary}")
