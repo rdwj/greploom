@@ -191,6 +191,13 @@ greploom reads treeloom's CPG JSON format but does not import treeloom at runtim
 
 greploom's query output includes structural summaries and graph context (callers, callees, parameters), not raw source code. Source text inclusion is a treeloom CPG concern — when treeloom adds source spans to CPG nodes, greploom will surface them automatically.
 
+## Documentation
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute, development setup, testing
+- [SECURITY.md](SECURITY.md) — vulnerability reporting policy
+- [llms.txt](llms.txt) / [llms-full.txt](llms-full.txt) — LLM-friendly project documentation ([llmstxt.org](https://llmstxt.org/))
+- [CLAUDE.md](CLAUDE.md) — project context for AI coding assistants
+
 ## Changelog
 
 ### Version 0.2.0
@@ -202,10 +209,6 @@ greploom's query output includes structural summaries and graph context (callers
 ### Version 0.1.0
 
 Initial release — full indexing pipeline (summarize, embed, store), hybrid search with RRF, graph expansion for context neighborhoods, token budget management, CLI (index/query/serve), and MCP server with search_code/index_code tools.
-
-## LLM Documentation
-
-This project provides [llms.txt](llms.txt) and [llms-full.txt](llms-full.txt) files following the [llmstxt.org](https://llmstxt.org/) specification for LLM-friendly documentation.
 
 ## License
 

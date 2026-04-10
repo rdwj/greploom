@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-_VALID_SUMMARY_TIERS = ("fast", "enhanced", "llm")
+_VALID_SUMMARY_TIERS = ("fast", "enhanced")
 
 
 @dataclass

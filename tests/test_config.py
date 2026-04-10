@@ -60,7 +60,6 @@ _ALL_ENV_KEYS = [
         ("GREPLOOM_EMBEDDING_MODEL", "custom-model", "embedding_model", "custom-model"),
         ("GREPLOOM_DB_PATH", "/data/index.db", "db_path", "/data/index.db"),
         ("GREPLOOM_TOKEN_BUDGET", "512", "token_budget", 512),
-        ("GREPLOOM_SUMMARY_TIER", "llm", "summary_tier", "llm"),
     ],
 )
 def test_from_env_partial_override(monkeypatch, env_key, env_val, attr, expected):
@@ -121,7 +120,7 @@ def test_empty_db_path_raises():
         GrepLoomConfig(db_path="")
 
 
-@pytest.mark.parametrize("tier", ["fast", "enhanced", "llm"])
+@pytest.mark.parametrize("tier", ["fast", "enhanced"])
 def test_valid_summary_tiers(tier):
     cfg = GrepLoomConfig(summary_tier=tier)
     assert cfg.summary_tier == tier
