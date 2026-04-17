@@ -201,6 +201,11 @@ greploom's query output includes structural summaries and graph context (callers
 
 ## Changelog
 
+### Version 0.5.0
+
+- JSON query output in CPG mode now includes a `source` field with raw source text (when `--include-source` is used) and a `structural_context` dict with `callers`, `callees`, `parameters`, `parent_class`, `data_sources`, and `imports` as structured data.
+- Programmatic consumers can access source code and graph relationships directly without parsing the formatted markdown `text` field.
+
 ### Version 0.4.0
 
 - All query output modes (search-only, `--cpg` expansion, `--node` lookup) now use a consistent `{"metadata": {...}, "results": [...]}` JSON envelope with the embedding model, greploom version, and index timestamps.
