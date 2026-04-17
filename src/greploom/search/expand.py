@@ -4,9 +4,27 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import TypedDict
 
 from greploom.cpg_types import CpgData, CpgEdge, CpgNode, EdgeKind, NodeKind
 from greploom.index.summarizer import build_edges_from, build_node_lookup
+
+
+class NodeRef(TypedDict):
+    node_id: str
+    name: str
+    file: str | None
+    line: int | None
+
+
+class StructuralContext(TypedDict):
+    callers: list[NodeRef]
+    callees: list[NodeRef]
+    parameters: list[NodeRef]
+    parent_class: NodeRef | None
+    data_sources: list[NodeRef]
+    imports: list[NodeRef]
+
 
 # Relationship priority for stable sort (lower = higher priority).
 _REL_PRIORITY = {
@@ -25,6 +43,16 @@ class ExpandedNode:
     node: CpgNode
     relevance: float  # 1.0 for hit, decaying by relationship
     relationship: str  # "hit", "caller", "callee", "parameter", "class", "import", "data_source"
+    structural_context: StructuralContext | None = None
+
+
+def _node_ref(node: CpgNode) -> NodeRef:
+    return NodeRef(
+        node_id=node.id,
+        name=node.name,
+        file=node.location.file if node.location else None,
+        line=node.location.line if node.location else None,
+    )
 
 
 def _build_edges_to(cpg: CpgData) -> dict[str, list[CpgEdge]]:
@@ -103,6 +131,64 @@ def _expand_one(
     return results
 
 
+def _build_structural_context(
+    node_id: str,
+    node_lookup: dict[str, CpgNode],
+    edges_from: dict[str, list[CpgEdge]],
+    edges_to: dict[str, list[CpgEdge]],
+) -> StructuralContext:
+    """Return structured relationship data for a single CPG node."""
+    outgoing = edges_from.get(node_id, [])
+    incoming = edges_to.get(node_id, [])
+
+    callers = [
+        _node_ref(node_lookup[e.source])
+        for e in incoming
+        if e.kind is EdgeKind.CALLS and e.source in node_lookup
+    ]
+    callees = [
+        _node_ref(node_lookup[e.target])
+        for e in outgoing
+        if e.kind is EdgeKind.CALLS and e.target in node_lookup
+    ]
+    parameters = [
+        _node_ref(node_lookup[e.target])
+        for e in outgoing
+        if e.kind is EdgeKind.HAS_PARAMETER and e.target in node_lookup
+    ]
+
+    parent_class: NodeRef | None = None
+    node = node_lookup.get(node_id)
+    if node and node.scope:
+        parent = node_lookup.get(node.scope)
+        if parent and parent.kind is NodeKind.CLASS:
+            parent_class = _node_ref(parent)
+
+    data_sources = [
+        _node_ref(node_lookup[e.source])
+        for e in incoming
+        if e.kind is EdgeKind.DATA_FLOWS_TO and e.source in node_lookup
+    ]
+
+    imports: list[NodeRef] = []
+    module = _module_ancestor(node_id, node_lookup)
+    if module:
+        imports = [
+            _node_ref(node_lookup[e.target])
+            for e in edges_from.get(module.id, [])
+            if e.kind is EdgeKind.IMPORTS and e.target in node_lookup
+        ]
+
+    return StructuralContext(
+        callers=callers,
+        callees=callees,
+        parameters=parameters,
+        parent_class=parent_class,
+        data_sources=data_sources,
+        imports=imports,
+    )
+
+
 def expand_hits(
     hit_node_ids: list[str],
     cpg: CpgData,
@@ -152,7 +238,12 @@ def expand_hits(
         frontier = next_frontier
 
     expanded = [
-        ExpandedNode(node=node_lookup[nid], relevance=rel, relationship=relationship)
+        ExpandedNode(
+            node=node_lookup[nid],
+            relevance=rel,
+            relationship=relationship,
+            structural_context=_build_structural_context(nid, node_lookup, edges_from, edges_to),
+        )
         for nid, (rel, relationship) in best.items()
     ]
     expanded.sort(key=lambda e: (-e.relevance, _REL_PRIORITY.get(e.relationship, 99)))

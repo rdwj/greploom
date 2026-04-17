@@ -70,7 +70,7 @@ Options:
   --include-source        Include raw source text from the CPG when available
 ```
 
-Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget. All `--format json` output is wrapped in `{"metadata": {...}, "results": [...]}` including the embedding model, greploom version, and index timestamps.
+Without `--cpg`: returns ranked search hits. With `--cpg`: expands hits through the graph and assembles a context bundle trimmed to the token budget. All `--format json` output is wrapped in `{"metadata": {...}, "results": [...]}` including the embedding model, greploom version, and index timestamps. Each result object in CPG mode includes a `source` field (raw source text when `--include-source` is used, null otherwise) and a `structural_context` dict with `callers`, `callees`, `parameters`, `parent_class`, `data_sources`, and `imports` for programmatic consumers.
 
 Use `--node` to retrieve context for known CPG node IDs directly, bypassing the search step entirely. Requires `--cpg`. Mutually exclusive with `QUERY_TEXT`.
 
@@ -297,13 +297,28 @@ Fetches `top_k * 2` results from both vector and BM25 backends, merges via recip
 ### Graph Expansion
 
 ```python
-from greploom.search.expand import expand_hits, ExpandedNode
+from greploom.search.expand import expand_hits, ExpandedNode, StructuralContext, NodeRef
+
+class NodeRef(TypedDict):
+    node_id: str
+    name: str
+    file: str | None
+    line: int | None
+
+class StructuralContext(TypedDict):
+    callers: list[NodeRef]
+    callees: list[NodeRef]
+    parameters: list[NodeRef]
+    parent_class: NodeRef | None
+    data_sources: list[NodeRef]
+    imports: list[NodeRef]
 
 @dataclass
 class ExpandedNode:
     node: CpgNode
     relevance: float     # 1.0 for hit, decaying by relationship type
     relationship: str    # "hit", "caller", "callee", "parameter", "class", "import", "data_source"
+    structural_context: StructuralContext | None = None  # per-node graph relationships
 
 def expand_hits(
     hit_node_ids: list[str],
@@ -329,6 +344,8 @@ class ContextBlock:
     relationship: str
     text: str       # formatted markdown block
     tokens: int     # token count of text
+    source: str | None = None                # raw source text (when --include-source)
+    structural_context: StructuralContext | None = None  # per-node graph relationships
 
 @dataclass
 class ContextResult:

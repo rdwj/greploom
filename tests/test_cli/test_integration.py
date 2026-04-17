@@ -227,7 +227,11 @@ def test_node_mode_json_format(indexed_db: Path, runner: CliRunner) -> None:
     assert "results" in payload, f"Expected 'results' key in output: {result.output}"
     assert len(payload["results"]) > 0
     block = payload["results"][0]
-    for key in ("node_id", "name", "kind", "file", "line", "relationship", "tokens", "text"):
+    expected_keys = (
+        "node_id", "name", "kind", "file", "line", "relationship",
+        "tokens", "text", "source", "structural_context",
+    )
+    for key in expected_keys:
         assert key in block, f"Missing key {key!r} in block: {block}"
 
 
@@ -391,3 +395,131 @@ def test_query_include_source_with_search_and_cpg(tmp_path: Path, runner: CliRun
     assert "def handle_request" in result.output or "def validate_input" in result.output, (
         f"Expected raw source text in output, got: {result.output!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# source and structural_context JSON output tests
+# ---------------------------------------------------------------------------
+
+
+def test_node_json_has_source_when_include_source(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--format", "json",
+            "--include-source",
+            "--db", str(indexed_db_with_source),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    hit = next(b for b in payload["results"] if b["node_id"] == NODE_HANDLE_REQUEST)
+    assert hit["source"] is not None
+    assert "def handle_request" in hit["source"]
+
+
+def test_node_json_source_null_without_flag(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--format", "json",
+            "--db", str(indexed_db_with_source),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    hit = next(b for b in payload["results"] if b["node_id"] == NODE_HANDLE_REQUEST)
+    assert hit["source"] is None
+
+
+def test_node_json_has_structural_context(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--format", "json",
+            "--db", str(indexed_db_with_source),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    hit = next(b for b in payload["results"] if b["node_id"] == NODE_HANDLE_REQUEST)
+    ctx = hit["structural_context"]
+    assert isinstance(ctx, dict)
+    for key in ("callers", "callees", "parameters", "parent_class", "data_sources", "imports"):
+        assert key in ctx, f"Missing key {key!r} in structural_context"
+
+
+def test_node_json_structural_context_callees(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
+    """handle_request calls validate_input — verify callee appears in structural_context."""
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "--node", NODE_HANDLE_REQUEST,
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--format", "json",
+            "--db", str(indexed_db_with_source),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    hit = next(b for b in payload["results"] if b["node_id"] == NODE_HANDLE_REQUEST)
+    callee_ids = [c["node_id"] for c in hit["structural_context"]["callees"]]
+    assert NODE_VALIDATE_INPUT in callee_ids
+
+
+def test_search_with_cpg_json_has_structural_context(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "handle request",
+            "--db", str(indexed_db_with_source),
+            "--cpg", str(SMALL_CPG_WITH_SOURCE),
+            "--format", "json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert len(payload["results"]) > 0
+    for block in payload["results"]:
+        assert "structural_context" in block
+        assert isinstance(block["structural_context"], dict)
+
+
+def test_search_without_cpg_json_no_structural_context(
+    indexed_db_with_source: Path, runner: CliRunner
+) -> None:
+    """Search-only mode (no --cpg) has a different schema — no structural_context."""
+    result = runner.invoke(
+        main,
+        [
+            "query",
+            "handle request",
+            "--db", str(indexed_db_with_source),
+            "--format", "json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    if payload["results"]:
+        assert "structural_context" not in payload["results"][0]

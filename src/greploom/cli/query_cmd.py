@@ -116,6 +116,8 @@ def query(
                     "relationship": b.relationship,
                     "tokens": b.tokens,
                     "text": b.text,
+                    "source": b.source,
+                    "structural_context": b.structural_context,
                 }
                 for b in ctx.blocks
             ]
@@ -156,6 +158,8 @@ def query(
                         "relationship": b.relationship,
                         "tokens": b.tokens,
                         "text": b.text,
+                        "source": b.source,
+                        "structural_context": b.structural_context,
                     }
                     for b in ctx.blocks
                 ]

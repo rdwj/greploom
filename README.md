@@ -105,7 +105,7 @@ Options:
   --include-source        Include raw source text from the CPG when available
 ```
 
-Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget. All `--format json` output is wrapped in `{"metadata": {...}, "results": [...]}` including the embedding model, greploom version, and index timestamps.
+Without `--cpg`, the query returns ranked search hits with scores and summaries. With `--cpg`, hits are expanded through the graph and assembled into a context bundle trimmed to the token budget. All `--format json` output is wrapped in `{"metadata": {...}, "results": [...]}` including the embedding model, greploom version, and index timestamps. Each result object in CPG mode includes a `source` field (raw source text when `--include-source` is used, null otherwise) and a `structural_context` dict with `callers`, `callees`, `parameters`, `parent_class`, `data_sources`, and `imports` for programmatic consumers.
 
 Use `--node` to retrieve context for known CPG node IDs directly, bypassing the search step entirely. Requires `--cpg`.
 

@@ -179,3 +179,78 @@ def test_relevance_decay(cpg, node_id, expected_rel):
     result = expand_hits(["fn1"], cpg)
     node = _by_id(result, node_id)
     assert abs(node.relevance - expected_rel) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Structural context tests
+# ---------------------------------------------------------------------------
+
+
+def test_structural_context_populated_on_all_nodes(cpg):
+    """expand_hits attaches structural_context to every ExpandedNode."""
+    result = expand_hits(["fn1"], cpg)
+    for node in result:
+        assert node.structural_context is not None
+
+
+def test_structural_context_fn1_callees(cpg):
+    result = expand_hits(["fn1"], cpg)
+    ctx = _by_id(result, "fn1").structural_context
+    assert len(ctx["callees"]) == 1
+    assert ctx["callees"][0]["node_id"] == "fn2"
+    assert ctx["callees"][0]["name"] == "fn_two"
+
+
+def test_structural_context_fn1_no_callers(cpg):
+    result = expand_hits(["fn1"], cpg)
+    ctx = _by_id(result, "fn1").structural_context
+    assert ctx["callers"] == []
+
+
+def test_structural_context_fn1_parameters(cpg):
+    result = expand_hits(["fn1"], cpg)
+    ctx = _by_id(result, "fn1").structural_context
+    param_ids = {p["node_id"] for p in ctx["parameters"]}
+    assert param_ids == {"param1", "param2"}
+
+
+def test_structural_context_fn1_parent_class(cpg):
+    result = expand_hits(["fn1"], cpg)
+    ctx = _by_id(result, "fn1").structural_context
+    assert ctx["parent_class"] is not None
+    assert ctx["parent_class"]["node_id"] == "cls1"
+    assert ctx["parent_class"]["name"] == "MyClass"
+
+
+def test_structural_context_fn1_data_sources(cpg):
+    result = expand_hits(["fn1"], cpg)
+    ctx = _by_id(result, "fn1").structural_context
+    assert len(ctx["data_sources"]) == 1
+    assert ctx["data_sources"][0]["node_id"] == "var1"
+
+
+def test_structural_context_fn1_imports(cpg):
+    """fn1 is inside cls1 inside mod1; imports come from mod1."""
+    result = expand_hits(["fn1"], cpg)
+    ctx = _by_id(result, "fn1").structural_context
+    assert len(ctx["imports"]) == 1
+    assert ctx["imports"][0]["node_id"] == "imp1"
+
+
+def test_structural_context_fn2_has_caller(cpg):
+    result = expand_hits(["fn2"], cpg)
+    ctx = _by_id(result, "fn2").structural_context
+    assert len(ctx["callers"]) == 1
+    assert ctx["callers"][0]["node_id"] == "fn1"
+
+
+def test_structural_context_node_with_no_relationships(cpg):
+    """param1 has no outgoing CALLS/HAS_PARAMETER edges, no parent class, no data flow."""
+    result = expand_hits(["fn1"], cpg)
+    ctx = _by_id(result, "param1").structural_context
+    assert ctx["callers"] == []
+    assert ctx["callees"] == []
+    assert ctx["parameters"] == []
+    assert ctx["parent_class"] is None
+    assert ctx["data_sources"] == []
+    assert ctx["imports"] == []

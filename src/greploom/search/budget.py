@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import tiktoken
 
 from greploom.cpg_types import NodeKind
-from greploom.search.expand import ExpandedNode
+from greploom.search.expand import ExpandedNode, StructuralContext
 
 # Lazy singleton — initialized on first use.
 _encoder: tiktoken.Encoding | None = None
@@ -134,6 +134,8 @@ class ContextBlock:
     relationship: str
     text: str
     tokens: int
+    source: str | None = None
+    structural_context: StructuralContext | None = None
 
 
 @dataclass
@@ -175,6 +177,7 @@ def assemble_context(
             count = _count_tokens(text)
             result.truncated = True
 
+        source = exp.node.attrs.get("source_text") if include_source else None
         result.blocks.append(ContextBlock(
             node_id=node.id,
             file=loc.file if loc else None,
@@ -184,6 +187,8 @@ def assemble_context(
             relationship=exp.relationship,
             text=text,
             tokens=count,
+            source=source,
+            structural_context=exp.structural_context,
         ))
         result.total_tokens += count
         remaining -= count

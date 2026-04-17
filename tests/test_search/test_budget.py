@@ -253,3 +253,65 @@ def test_format_block_escapes_backticks_in_source():
     assert "````python" in text
     assert text.endswith("````")
     assert source.rstrip("\n") in text
+
+
+# ---------------------------------------------------------------------------
+# source and structural_context field tests
+# ---------------------------------------------------------------------------
+
+
+def test_source_populated_with_include_source():
+    """source field has raw source text when include_source=True and source_text exists."""
+    expanded = ExpandedNode(node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit")
+    result = assemble_context([expanded], budget=500, include_source=True)
+    assert len(result.blocks) == 1
+    assert result.blocks[0].source == _SOURCE_TEXT
+
+
+def test_source_null_without_include_source():
+    """source field is None when include_source=False even if source_text exists."""
+    expanded = ExpandedNode(node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit")
+    result = assemble_context([expanded], budget=500, include_source=False)
+    assert len(result.blocks) == 1
+    assert result.blocks[0].source is None
+
+
+def test_source_null_when_no_source_text():
+    """source field is None when node has no source_text attr."""
+    expanded = ExpandedNode(node=_NODE_WITHOUT_SOURCE, relevance=1.0, relationship="hit")
+    result = assemble_context([expanded], budget=500, include_source=True)
+    assert len(result.blocks) == 1
+    assert result.blocks[0].source is None
+
+
+def test_structural_context_passed_through():
+    """structural_context from ExpandedNode appears on ContextBlock."""
+    from greploom.search.expand import StructuralContext
+    ctx = StructuralContext(
+        callers=[], callees=[], parameters=[],
+        parent_class=None, data_sources=[], imports=[],
+    )
+    expanded = ExpandedNode(
+        node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit",
+        structural_context=ctx,
+    )
+    result = assemble_context([expanded], budget=500)
+    assert result.blocks[0].structural_context is ctx
+
+
+def test_structural_context_none_when_not_set():
+    """Backward compat: ExpandedNode without structural_context -> None on block."""
+    expanded = ExpandedNode(node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit")
+    result = assemble_context([expanded], budget=500)
+    assert result.blocks[0].structural_context is None
+
+
+def test_source_does_not_affect_token_count():
+    """The source field is metadata — it must not change the tokens count."""
+    expanded = ExpandedNode(node=_NODE_WITH_SOURCE, relevance=1.0, relationship="hit")
+    result_without = assemble_context([expanded], budget=500, include_source=False)
+    result_with = assemble_context([expanded], budget=500, include_source=True)
+    # text differs (source is embedded in markdown), but source field is separate
+    # The key check: tokens reflects text, not the source field size
+    for r in (result_without, result_with):
+        assert r.blocks[0].tokens == _count_tokens(r.blocks[0].text)
