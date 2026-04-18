@@ -124,3 +124,37 @@ def test_empty_db_path_raises():
 def test_valid_summary_tiers(tier):
     cfg = GrepLoomConfig(summary_tier=tier)
     assert cfg.summary_tier == tier
+
+
+# ---------------------------------------------------------------------------
+# Validation — embedding_provider
+# ---------------------------------------------------------------------------
+
+
+def test_embedding_provider_default():
+    cfg = GrepLoomConfig()
+    assert cfg.embedding_provider == "ollama"
+
+
+@pytest.mark.parametrize("provider", ["ollama", "openai"])
+def test_valid_embedding_providers(provider):
+    cfg = GrepLoomConfig(embedding_provider=provider)
+    assert cfg.embedding_provider == provider
+
+
+@pytest.mark.parametrize("bad_provider", ["", "OpenAI", "vllm", "azure", "huggingface"])
+def test_invalid_embedding_provider_raises(bad_provider):
+    with pytest.raises(ValueError, match="embedding_provider"):
+        GrepLoomConfig(embedding_provider=bad_provider)
+
+
+def test_embedding_provider_from_env(monkeypatch):
+    monkeypatch.setenv("GREPLOOM_EMBEDDING_PROVIDER", "openai")
+    cfg = GrepLoomConfig.from_env()
+    assert cfg.embedding_provider == "openai"
+
+
+def test_embedding_provider_invalid_from_env_raises(monkeypatch):
+    monkeypatch.setenv("GREPLOOM_EMBEDDING_PROVIDER", "bogus")
+    with pytest.raises(ValueError, match="embedding_provider"):
+        GrepLoomConfig.from_env()

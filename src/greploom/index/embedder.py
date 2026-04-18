@@ -10,9 +10,11 @@ class EmbeddingClient:
         self,
         url: str = "http://localhost:11434",
         model: str = "nomic-embed-text",
+        provider: str = "ollama",
     ) -> None:
         self._url = url.rstrip("/")
         self._model = model
+        self._provider = provider
         self._client = httpx.Client(timeout=60.0)
 
     def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
@@ -42,7 +44,11 @@ class EmbeddingClient:
     # ------------------------------------------------------------------
 
     def _post_batch(self, batch: list[str]) -> list[list[float]]:
-        endpoint = f"{self._url}/api/embed"
+        if self._provider == "openai":
+            endpoint = f"{self._url}/v1/embeddings"
+        else:
+            endpoint = f"{self._url}/api/embed"
+
         try:
             response = self._client.post(
                 endpoint,
@@ -50,11 +56,11 @@ class EmbeddingClient:
             )
         except httpx.ConnectError:
             raise ConnectionError(
-                f"Cannot connect to embedding service at {self._url}. Is ollama running?"
+                f"Cannot connect to embedding server at {self._url}."
             )
         except httpx.TimeoutException:
             raise ConnectionError(
-                f"Request to embedding service at {self._url} timed out."
+                f"Request to embedding server at {self._url} timed out."
             )
 
         try:
@@ -66,10 +72,24 @@ class EmbeddingClient:
             ) from exc
 
         data = response.json()
-        if "embeddings" not in data:
-            raise RuntimeError(
-                f"Unexpected response from embedding service — missing 'embeddings' key. "
-                f"Got: {list(data.keys())}"
-            )
 
-        return data["embeddings"]
+        if self._provider == "openai":
+            if "data" not in data:
+                raise RuntimeError(
+                    f"Unexpected response from embedding server — missing 'data' key. "
+                    f"Got: {list(data.keys())}"
+                )
+            try:
+                return [item["embedding"] for item in data["data"]]
+            except (KeyError, TypeError) as exc:
+                raise RuntimeError(
+                    f"Malformed embedding response — expected 'embedding' key in each item. "
+                    f"First item: {data['data'][0] if data['data'] else '<empty>'}"
+                ) from exc
+        else:
+            if "embeddings" not in data:
+                raise RuntimeError(
+                    f"Unexpected response from embedding server — missing 'embeddings' key. "
+                    f"Got: {list(data.keys())}"
+                )
+            return data["embeddings"]

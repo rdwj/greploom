@@ -89,7 +89,7 @@ def run_index(
 
         # Phase 3: batch embed
         texts = [summary for _, summary, _ in to_embed]
-        with EmbeddingClient(config.embedding_url, config.embedding_model) as client:
+        with EmbeddingClient(config.embedding_url, config.embedding_model, config.embedding_provider) as client:
             embeddings = client.embed(texts)
 
         # Phase 4: upsert

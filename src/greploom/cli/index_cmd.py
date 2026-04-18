@@ -23,6 +23,12 @@ from greploom.index import run_index
 )
 @click.option("--model", "embedding_model", default=None, help="Embedding model name.")
 @click.option("--ollama-url", "embedding_url", default=None, help="Ollama server URL.")
+@click.option(
+    "--embedding-url",
+    "openai_embedding_url",
+    default=None,
+    help="OpenAI-compatible embedding endpoint (e.g. vLLM). Sets provider to 'openai'.",
+)
 @click.option("--force", is_flag=True, help="Re-index all nodes, ignoring content hashes.")
 def index(
     cpg_json: str,
@@ -30,15 +36,26 @@ def index(
     tier: str | None,
     embedding_model: str | None,
     embedding_url: str | None,
+    openai_embedding_url: str | None,
     force: bool,
 ) -> None:
     """Build the search index from a treeloom CPG JSON file."""
+    if embedding_url is not None and openai_embedding_url is not None:
+        raise click.UsageError("Cannot use both --ollama-url and --embedding-url")
+
     config = GrepLoomConfig.from_env()
+
+    if openai_embedding_url is not None:
+        embedding_url = openai_embedding_url
 
     overrides = {k: v for k, v in [
         ("db_path", db_path), ("summary_tier", tier),
         ("embedding_model", embedding_model), ("embedding_url", embedding_url),
     ] if v is not None}
+    if openai_embedding_url is not None:
+        overrides["embedding_provider"] = "openai"
+    elif embedding_url is not None:
+        overrides["embedding_provider"] = "ollama"
     if overrides:
         config = dataclasses.replace(config, **overrides)
 
@@ -49,8 +66,8 @@ def index(
 
     try:
         result = run_index(Path(cpg_json), config, progress=click.echo)
-    except ConnectionError as exc:
-        click.echo(f"Error: embedding service unavailable — {exc}", err=True)
+    except (ConnectionError, RuntimeError) as exc:
+        click.echo(f"Error: embedding service — {exc}", err=True)
         sys.exit(1)
 
     click.echo(

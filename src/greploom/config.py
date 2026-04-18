@@ -4,17 +4,24 @@ import os
 from dataclasses import dataclass
 
 _VALID_SUMMARY_TIERS = ("fast", "enhanced")
+_VALID_EMBEDDING_PROVIDERS = ("ollama", "openai")
 
 
 @dataclass
 class GrepLoomConfig:
     embedding_url: str = "http://localhost:11434"
     embedding_model: str = "nomic-embed-text"
+    embedding_provider: str = "ollama"
     db_path: str = ".greploom/index.db"
     token_budget: int = 8192
     summary_tier: str = "enhanced"
 
     def __post_init__(self) -> None:
+        if self.embedding_provider not in _VALID_EMBEDDING_PROVIDERS:
+            raise ValueError(
+                f"Invalid embedding_provider {self.embedding_provider!r}. "
+                f"Must be one of: {', '.join(_VALID_EMBEDDING_PROVIDERS)}"
+            )
         if self.summary_tier not in _VALID_SUMMARY_TIERS:
             raise ValueError(
                 f"Invalid summary_tier {self.summary_tier!r}. "
@@ -49,6 +56,9 @@ class GrepLoomConfig:
             ),
             embedding_model=os.environ.get(
                 "GREPLOOM_EMBEDDING_MODEL", defaults["embedding_model"].default
+            ),
+            embedding_provider=os.environ.get(
+                "GREPLOOM_EMBEDDING_PROVIDER", defaults["embedding_provider"].default
             ),
             db_path=os.environ.get("GREPLOOM_DB_PATH", defaults["db_path"].default),
             token_budget=token_budget,
