@@ -27,7 +27,7 @@ greploom/
 │   ├── __init__.py
 │   ├── index/          # Indexing pipeline: summarizer, embedder, storage
 │   │   ├── summarizer.py    # Generate text summaries from CPG nodes
-│   │   ├── embedder.py      # Embed summaries via ollama or API
+│   │   ├── embedder.py      # Embed summaries via Ollama or OpenAI-compatible API
 │   │   └── store.py         # SQLite storage (sqlite-vec + FTS5 + metadata)
 │   ├── search/         # Search engine: hybrid search, ranking, context assembly
 │   │   ├── hybrid.py        # BM25 + vector search with RRF
