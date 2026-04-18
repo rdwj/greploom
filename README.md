@@ -11,7 +11,7 @@ pip install greploom           # Core — CLI and search engine
 pip install greploom[mcp]      # Adds MCP server (requires fastmcp)
 ```
 
-The default embedding model is `nomic-embed-text` via a local [Ollama](https://ollama.com) instance. Any OpenAI-compatible embedding endpoint works via `GREPLOOM_EMBEDDING_URL`.
+The default embedding model is `nomic-embed-text` via a local [Ollama](https://ollama.com) instance. Any OpenAI-compatible embedding endpoint (vLLM, OpenAI, etc.) works via `--embedding-url` or the `GREPLOOM_EMBEDDING_URL` / `GREPLOOM_EMBEDDING_PROVIDER` environment variables.
 
 ## Quick Start
 
@@ -63,6 +63,7 @@ Options:
   --tier [fast|enhanced] Summary tier (default: enhanced)
   --model TEXT           Embedding model name
   --ollama-url URL       Ollama server URL
+  --embedding-url URL    OpenAI-compatible endpoint (e.g. vLLM); mutually exclusive with --ollama-url
   --force                Re-index all nodes, ignoring content hashes
 ```
 
@@ -81,6 +82,9 @@ greploom index cpg.json --db /tmp/myproject.db --force
 
 # Point at a non-default Ollama instance
 greploom index cpg.json --ollama-url http://gpu-box:11434
+
+# Use a vLLM or OpenAI-compatible embedding endpoint
+greploom index cpg.json --embedding-url https://my-vllm-server:8000 --model all-MiniLM-L6-v2
 ```
 
 ### `greploom query`
@@ -173,17 +177,23 @@ All settings can be provided via environment variables. CLI flags override envir
 
 | Variable | Default | Description |
 |---|---|---|
-| `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Ollama or OpenAI-compatible endpoint |
+| `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Embedding server URL |
 | `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model name |
+| `GREPLOOM_EMBEDDING_PROVIDER` | `ollama` | Embedding protocol: `ollama` or `openai` |
 | `GREPLOOM_DB_PATH` | `.greploom/index.db` | SQLite database path |
 | `GREPLOOM_TOKEN_BUDGET` | `8192` | Default token budget for context assembly |
 | `GREPLOOM_SUMMARY_TIER` | `enhanced` | Summary tier (`fast` or `enhanced`) |
 
-To use an OpenAI-compatible embedding API instead of Ollama:
+To use an OpenAI-compatible embedding API (vLLM, OpenAI, etc.) instead of Ollama:
 
 ```bash
-export GREPLOOM_EMBEDDING_URL=https://api.openai.com/v1
-export GREPLOOM_EMBEDDING_MODEL=text-embedding-3-small
+# Via CLI flag (sets provider automatically)
+greploom index cpg.json --embedding-url https://my-vllm-server:8000 --model all-MiniLM-L6-v2
+
+# Via environment variables
+export GREPLOOM_EMBEDDING_URL=https://my-vllm-server:8000
+export GREPLOOM_EMBEDDING_MODEL=all-MiniLM-L6-v2
+export GREPLOOM_EMBEDDING_PROVIDER=openai
 ```
 
 ## Relationship to treeloom
@@ -200,6 +210,12 @@ greploom's query output includes structural summaries and graph context (callers
 - [CLAUDE.md](CLAUDE.md) — project context for AI coding assistants
 
 ## Changelog
+
+### Version 0.6.0
+
+- `--embedding-url` flag for `greploom index`: use any OpenAI-compatible embedding endpoint (vLLM, OpenAI, etc.) instead of Ollama. Mutually exclusive with `--ollama-url`.
+- New `embedding_provider` config field and `GREPLOOM_EMBEDDING_PROVIDER` environment variable (`ollama` or `openai`).
+- Error messages no longer assume Ollama — they reference the generic "embedding server".
 
 ### Version 0.5.0
 

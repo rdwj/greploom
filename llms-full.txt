@@ -1,6 +1,6 @@
 # greploom
 
-> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required. Current version: 0.3.0.
+> Semantic code search library with graph-aware context retrieval. Reads a treeloom Code Property Graph (CPG JSON), indexes it for hybrid search (vector + BM25), and returns structurally-complete context neighborhoods for LLM consumption. Python 3.10+, SQLite-only storage, no servers required.
 
 greploom does not parse source code. It consumes CPG JSON produced by [treeloom](https://github.com/rdwj/treeloom), which handles parsing via tree-sitter. Any tool that produces treeloom-compatible CPG JSON will work.
 
@@ -30,7 +30,7 @@ pip install greploom           # Core — CLI and search engine
 pip install greploom[mcp]      # Adds MCP server (requires fastmcp)
 ```
 
-Requires a local [Ollama](https://ollama.com) instance with `nomic-embed-text` for embeddings (default). Any OpenAI-compatible endpoint works via `GREPLOOM_EMBEDDING_URL`.
+Default embedding model is `nomic-embed-text` via a local [Ollama](https://ollama.com) instance. Any OpenAI-compatible endpoint (vLLM, OpenAI, etc.) works via `--embedding-url` or the `GREPLOOM_EMBEDDING_PROVIDER` environment variable.
 
 ## CLI
 
@@ -44,6 +44,7 @@ Options:
   --tier [fast|enhanced] Summary tier (default: enhanced)
   --model TEXT           Embedding model name
   --ollama-url URL       Ollama server URL
+  --embedding-url URL    OpenAI-compatible endpoint (e.g. vLLM); mutually exclusive with --ollama-url
   --force                Re-index all nodes, ignoring content hashes
 ```
 
@@ -93,8 +94,9 @@ All settings can be provided via environment variables. CLI flags override them.
 
 | Variable | Default | Description |
 |---|---|---|
-| `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Ollama or OpenAI-compatible endpoint |
+| `GREPLOOM_EMBEDDING_URL` | `http://localhost:11434` | Embedding server URL |
 | `GREPLOOM_EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model name |
+| `GREPLOOM_EMBEDDING_PROVIDER` | `ollama` | Embedding protocol: `ollama` or `openai` |
 | `GREPLOOM_DB_PATH` | `.greploom/index.db` | SQLite database path |
 | `GREPLOOM_TOKEN_BUDGET` | `8192` | Default token budget for context assembly |
 | `GREPLOOM_SUMMARY_TIER` | `enhanced` | Summary tier (`fast` or `enhanced`) |
@@ -239,13 +241,13 @@ Enhanced tier adds: Parameters, Calls, Decorators, Methods (for classes), Contai
 from greploom.index.embedder import EmbeddingClient
 
 class EmbeddingClient:
-    def __init__(self, url: str = "http://localhost:11434", model: str = "nomic-embed-text")
+    def __init__(self, url: str = "http://localhost:11434", model: str = "nomic-embed-text", provider: str = "ollama")
     def embed(self, texts: list[str], batch_size: int = 32) -> list[list[float]]
     def embed_one(self, text: str) -> list[float]
     def close(self) -> None
 ```
 
-Calls `POST {url}/api/embed` with `{"model": model, "input": texts}`. Raises `ConnectionError` if Ollama is unreachable, `RuntimeError` on bad status or missing `embeddings` key.
+When `provider="ollama"`, calls `POST {url}/api/embed` with `{"model": model, "input": texts}` and parses `response["embeddings"]`. When `provider="openai"`, calls `POST {url}/v1/embeddings` and parses `response["data"][*]["embedding"]`. Raises `ConnectionError` if the server is unreachable, `RuntimeError` on bad status or malformed responses.
 
 ### SQLite Store
 
@@ -429,6 +431,6 @@ greploom/
 - **Node IDs are opaque**: Format is `{kind}:{file}:{line}:{col}:{counter}` but consumers must not parse or construct them. Only use IDs from the CPG JSON.
 - **Indexing only FUNCTION/CLASS/MODULE**: Variables, parameters, calls, etc. are structural detail included via graph expansion, not direct search targets.
 - **Incremental by default**: `greploom index` tracks content hashes. Re-running only re-embeds changed nodes. Use `--force` for a full rebuild.
-- **Embedding endpoint**: Default is Ollama at `localhost:11434`. The API path is `/api/embed` (Ollama format), not `/v1/embeddings` (OpenAI format). The client sends `{"model": "...", "input": ["..."]}`.
+- **Embedding endpoint**: Default is Ollama at `localhost:11434` using `/api/embed`. Set `provider="openai"` (or use `--embedding-url` CLI flag) to switch to the OpenAI `/v1/embeddings` protocol for vLLM or other compatible servers.
 - **Token counting**: Uses `cl100k_base` (GPT-4 encoding) via tiktoken for budget management. The encoder is initialized lazily on first use.
 - **BM25 scores are negative**: FTS5 rank values are negative floats (more negative = better match). Vector scores are negated distances (higher = better). RRF normalizes both into positive fusion scores.

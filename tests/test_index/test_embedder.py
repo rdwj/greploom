@@ -193,7 +193,9 @@ def test_openai_request_payload() -> None:
         data = [{"embedding": [0.1] * DIM, "index": i} for i in range(n)]
         return httpx.Response(200, json={"data": data})
 
-    ec = EmbeddingClient(url="http://localhost:8000", model="text-embedding-ada-002", provider="openai")
+    ec = EmbeddingClient(
+        url="http://localhost:8000", model="text-embedding-ada-002", provider="openai",
+    )
     ec._client = httpx.Client(transport=httpx.MockTransport(capturing_handler))
     ec.embed(["foo", "bar"])
     ec.close()
